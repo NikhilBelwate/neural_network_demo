@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuroLab · Deep Network Lab</title>
+  <meta name="description" content="Advanced interactive MLP visualizer: a deep network with several hidden layers and multiple outputs, trained live with backpropagation and momentum." />
+  <meta name="theme-color" content="#020617" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23020617'/%3E%3Cg stroke='%23a855f7' stroke-width='1.2' opacity='.7'%3E%3Cpath d='M5 11L12 8M5 11L12 16M5 21L12 16M5 21L12 24M12 8L19 8M12 16L19 16M12 24L19 24M12 8L19 16M12 24L19 16M19 8L27 12M19 16L27 12M19 16L27 20M19 24L27 20'/%3E%3C/g%3E%3Ccircle cx='5' cy='11' r='2.2' fill='%2322d3ee'/%3E%3Ccircle cx='5' cy='21' r='2.2' fill='%2322d3ee'/%3E%3Ccircle cx='12' cy='8' r='2.2' fill='%23a855f7'/%3E%3Ccircle cx='12' cy='16' r='2.2' fill='%23a855f7'/%3E%3Ccircle cx='12' cy='24' r='2.2' fill='%23a855f7'/%3E%3Ccircle cx='19' cy='8' r='2.2' fill='%23c084fc'/%3E%3Ccircle cx='19' cy='16' r='2.2' fill='%23c084fc'/%3E%3Ccircle cx='19' cy='24' r='2.2' fill='%23c084fc'/%3E%3Ccircle cx='27' cy='12' r='2.6' fill='%2334d399'/%3E%3Ccircle cx='27' cy='20' r='2.6' fill='%2334d399'/%3E%3C/svg%3E" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <script>
+    if (window.tailwind) tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    :root { --cyan: #22d3ee; --purple: #a855f7; --emerald: #34d399; --rose: #fb7185; --amber: #fbbf24; }
+    html, body { background: #020617; }
+    body {
+      background-image:
+        radial-gradient(1200px 600px at 10% -10%, rgba(34, 211, 238, 0.08), transparent 60%),
+        radial-gradient(900px 600px at 100% 0%, rgba(168, 85, 247, 0.12), transparent 60%),
+        radial-gradient(800px 500px at 50% 110%, rgba(52, 211, 153, 0.06), transparent 60%);
+      background-attachment: fixed;
+    }
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+    .panel {
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(2, 6, 23, 0.72));
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 1rem;
+      box-shadow: 0 0 0 1px rgba(2, 6, 23, 0.6), 0 10px 40px -12px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .panel-title { font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: #94a3b8; }
+    .neon-text-cyan { color: var(--cyan); text-shadow: 0 0 12px rgba(34, 211, 238, 0.55); }
+    .neon-text-purple { color: #c084fc; text-shadow: 0 0 12px rgba(168, 85, 247, 0.55); }
+    .neon-text-emerald { color: var(--emerald); text-shadow: 0 0 12px rgba(52, 211, 153, 0.55); }
+
+    input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; background: transparent; height: 22px; }
+    input[type=range]:focus { outline: none; }
+    input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: linear-gradient(90deg, var(--cyan) 0%, var(--purple) var(--fill, 50%), rgba(148,163,184,.18) var(--fill, 50%)); }
+    input[type=range]::-moz-range-track { height: 4px; border-radius: 999px; background: rgba(148,163,184,.18); }
+    input[type=range]::-moz-range-progress { height: 4px; border-radius: 999px; background: linear-gradient(90deg, var(--cyan), var(--purple)); }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: #0f172a; border: 2px solid var(--cyan); box-shadow: 0 0 10px rgba(34, 211, 238, 0.7); cursor: pointer; }
+    input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #0f172a; border: 2px solid var(--cyan); box-shadow: 0 0 10px rgba(34, 211, 238, 0.7); cursor: pointer; }
+    input[type=range]:focus-visible::-webkit-slider-thumb { outline: 2px solid #fff; outline-offset: 2px; }
+    input[type=range].purple::-webkit-slider-thumb { border-color: var(--purple); box-shadow: 0 0 10px rgba(168, 85, 247, 0.7); }
+    input[type=range].purple::-moz-range-thumb { border-color: var(--purple); box-shadow: 0 0 10px rgba(168, 85, 247, 0.7); }
+
+    select, input[type=number] { color-scheme: dark; }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; border-radius: .75rem; font-weight: 600; font-size: .875rem; padding: .625rem .875rem; transition: all .15s ease; user-select: none; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-cyan { background: rgba(34, 211, 238, 0.12); color: #a5f3fc; border: 1px solid rgba(34, 211, 238, 0.45); box-shadow: 0 0 18px -6px rgba(34, 211, 238, 0.7), inset 0 0 12px -6px rgba(34, 211, 238, 0.6); }
+    .btn-cyan:hover:not(:disabled) { background: rgba(34, 211, 238, 0.2); box-shadow: 0 0 26px -4px rgba(34, 211, 238, 0.85); }
+    .btn-emerald { background: rgba(52, 211, 153, 0.12); color: #a7f3d0; border: 1px solid rgba(52, 211, 153, 0.45); box-shadow: 0 0 18px -6px rgba(52, 211, 153, 0.7); }
+    .btn-emerald:hover:not(:disabled) { background: rgba(52, 211, 153, 0.2); box-shadow: 0 0 26px -4px rgba(52, 211, 153, 0.85); }
+    .btn-emerald.active { background: rgba(251, 113, 133, 0.14); color: #fecdd3; border-color: rgba(251, 113, 133, 0.5); box-shadow: 0 0 22px -4px rgba(251, 113, 133, 0.8); }
+    .btn-ghost { background: rgba(148, 163, 184, 0.06); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.18); }
+    .btn-ghost:hover:not(:disabled) { background: rgba(148, 163, 184, 0.12); border-color: rgba(168, 85, 247, 0.5); color: #e9d5ff; }
+    .btn-purple { background: rgba(168, 85, 247, 0.12); color: #e9d5ff; border: 1px solid rgba(168, 85, 247, 0.45); box-shadow: 0 0 18px -6px rgba(168, 85, 247, 0.7); }
+    .btn-purple:hover:not(:disabled) { background: rgba(168, 85, 247, 0.22); box-shadow: 0 0 26px -4px rgba(168, 85, 247, 0.85); }
+
+    .bit { font-family: 'JetBrains Mono', monospace; font-size: .8rem; font-weight: 600; border-radius: .5rem; padding: .4rem 0; border: 1px solid rgba(148,163,184,.22); background: rgba(2,6,23,.7); color: #94a3b8; transition: all .15s; }
+    .bit.on { border-color: rgba(34,211,238,.6); background: rgba(34,211,238,.16); color: #cffafe; box-shadow: 0 0 14px -4px rgba(34,211,238,.8); }
+    .bit:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+    .field { width: 100%; background: rgba(2, 6, 23, 0.7); border: 1px solid rgba(148, 163, 184, 0.18); border-radius: .625rem; padding: .5rem .625rem; font-size: .875rem; color: #e2e8f0; transition: border-color .15s, box-shadow .15s; }
+    .field:focus { outline: none; border-color: rgba(34, 211, 238, 0.6); box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12); }
+
+    .chip { display: inline-flex; align-items: center; gap: .375rem; padding: .25rem .625rem; border-radius: 999px; font-size: .7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .pulse-dot { animation: pulseDot 1.2s ease-in-out infinite; }
+    @keyframes pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.75); } }
+
+    .toggle { position: relative; width: 36px; height: 20px; border-radius: 999px; background: rgba(148,163,184,.2); transition: background .2s; flex-shrink: 0; }
+    .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #cbd5e1; transition: transform .2s, background .2s; }
+    input:checked + .toggle { background: rgba(34, 211, 238, .35); box-shadow: 0 0 12px -2px rgba(34,211,238,.6); }
+    input:checked + .toggle::after { transform: translateX(16px); background: var(--cyan); }
+    input:focus-visible + .toggle { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+    .log-scroll::-webkit-scrollbar, .thin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .log-scroll::-webkit-scrollbar-thumb, .thin-scroll::-webkit-scrollbar-thumb { background: rgba(148,163,184,.25); border-radius: 999px; }
+    .log-scroll::-webkit-scrollbar-track, .thin-scroll::-webkit-scrollbar-track { background: transparent; }
+    .log-line { animation: fadeIn .25s ease; white-space: pre-wrap; word-break: break-word; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+
+    .kbd { font-family: 'JetBrains Mono', monospace; font-size: .65rem; padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(148,163,184,.3); color: #94a3b8; background: rgba(2,6,23,.6); }
+    .eq { font-family: 'JetBrains Mono', monospace; font-size: .78rem; line-height: 1.55; }
+    .eq sup, .eq sub { font-size: .65em; }
+    canvas { display: block; width: 100%; height: 100%; }
+    #nnTooltip { pointer-events: none; transition: opacity .12s ease; }
+    @media (prefers-reduced-motion: reduce) { .pulse-dot, .log-line { animation: none; } }
+  </style>
+</head>
+
+<body class="min-h-full text-slate-200 font-sans antialiased">
+  <!-- ============ HEADER ============ -->
+  <header class="sticky top-0 z-30 border-b border-white/5 bg-slate-950/75 backdrop-blur-md">
+    <div class="max-w-[1800px] mx-auto flex items-center justify-between gap-3 px-4 lg:px-6 py-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <a href="index.html" class="relative w-9 h-9 rounded-xl grid place-items-center bg-slate-900 border border-purple-400/30 shadow-[0_0_20px_-4px_rgba(168,85,247,0.6)] shrink-0" title="Back to the basic example">
+          <svg viewBox="0 0 32 32" class="w-6 h-6" aria-hidden="true">
+            <g stroke="#a855f7" stroke-width="1.1" opacity=".6"><path d="M5 11L12 8M5 11L12 16M5 21L12 16M5 21L12 24M12 8L19 8M12 16L19 16M12 24L19 24M12 8L19 16M12 24L19 16M19 8L27 12M19 16L27 12M19 16L27 20M19 24L27 20"/></g>
+            <circle cx="5" cy="11" r="2.2" fill="#22d3ee"/><circle cx="5" cy="21" r="2.2" fill="#22d3ee"/>
+            <circle cx="12" cy="8" r="2.2" fill="#a855f7"/><circle cx="12" cy="16" r="2.2" fill="#a855f7"/><circle cx="12" cy="24" r="2.2" fill="#a855f7"/>
+            <circle cx="19" cy="8" r="2.2" fill="#c084fc"/><circle cx="19" cy="16" r="2.2" fill="#c084fc"/><circle cx="19" cy="24" r="2.2" fill="#c084fc"/>
+            <circle cx="27" cy="12" r="2.6" fill="#34d399"/><circle cx="27" cy="20" r="2.6" fill="#34d399"/>
+          </svg>
+        </a>
+        <div class="min-w-0">
+          <h1 class="text-base sm:text-lg font-bold tracking-tight leading-tight truncate">
+            <span class="neon-text-cyan">Neuro</span><span class="neon-text-purple">Lab</span>
+            <span class="text-slate-400 font-medium hidden sm:inline">· Deep Network Lab</span>
+          </h1>
+          <p class="text-[11px] text-slate-500 truncate">Multiple hidden layers · Multi-output · Backpropagation with momentum</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <div class="hidden xl:flex items-center gap-1.5 text-[11px] text-slate-500 mr-2">
+          <span class="kbd">Space</span> run <span class="kbd">S</span> step <span class="kbd">R</span> reset
+        </div>
+        <a href="index.html" class="btn btn-ghost !py-1.5 !px-3 !text-xs" title="Back to the basic example">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>
+          <span class="hidden sm:inline">Basic Example</span><span class="sm:hidden">Basic</span>
+        </a>
+        <span id="statusChip" class="chip bg-slate-800/80 text-slate-300 border border-slate-600/40">
+          <span id="statusDot" class="dot bg-slate-400"></span><span id="statusText">Idle</span>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-[1800px] mx-auto flex flex-col lg:flex-row gap-4 p-4 lg:p-6">
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="w-full lg:w-[320px] xl:w-[340px] shrink-0 space-y-4" aria-label="Controls">
+      <section class="panel p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="panel-title">01 · Complex Example</h2>
+          <span id="dsCount" class="text-[11px] font-mono text-slate-500"></span>
+        </div>
+        <label for="datasetSelect" class="sr-only">Dataset</label>
+        <select id="datasetSelect" class="field">
+          <option value="seg7">7-Segment Display → 4-bit Binary</option>
+          <option value="adder">Binary Full Adder (3 in → 2 out)</option>
+          <option value="pinwheel">3-Class Pinwheel Classification</option>
+          <option value="spiral">Two Intertwined Spirals</option>
+        </select>
+        <p id="dsDesc" class="mt-3 text-xs leading-relaxed text-slate-400"></p>
+      </section>
+
+      <section class="panel p-4 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="panel-title">02 · Deep Architecture</h2>
+          <span id="topology" class="text-[11px] font-mono neon-text-cyan"></span>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1"><label for="layersRange" class="text-slate-400">Hidden layers</label><span id="layersVal" class="font-mono text-slate-200"></span></div>
+          <input id="layersRange" type="range" min="2" max="4" step="1" value="2" />
+        </div>
+        <div id="layerSliders" class="space-y-3 rounded-xl border border-purple-400/15 bg-purple-500/5 p-3"></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="actSelect" class="block text-xs text-slate-400 mb-1">Hidden activation</label>
+            <select id="actSelect" class="field">
+              <option value="sigmoid">Sigmoid</option>
+              <option value="tanh">Tanh</option>
+              <option value="relu">Leaky ReLU</option>
+            </select>
+          </div>
+          <div>
+            <span class="block text-xs text-slate-400 mb-1">Output layer</span>
+            <div id="outActLabel" class="field text-emerald-300 font-medium select-none">Sigmoid</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel p-4 space-y-4">
+        <h2 class="panel-title">03 · Hyperparameters</h2>
+        <div>
+          <div class="flex justify-between items-center text-xs mb-1">
+            <label for="lrRange" class="text-slate-400">Learning rate <span class="font-mono text-slate-500">η</span></label>
+            <input id="lrNumber" type="number" min="0.001" max="2" step="0.001" class="field !w-24 !py-1 !px-2 text-right font-mono text-xs" aria-label="Learning rate value" />
+          </div>
+          <input id="lrRange" type="range" min="0" max="1000" step="1" value="500" aria-label="Learning rate (log scale)" />
+          <div class="flex justify-between text-[10px] font-mono text-slate-600"><span>0.001</span><span>0.04</span><span>2.0</span></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1"><label for="momRange" class="text-slate-400">Momentum <span class="font-mono text-slate-500">β</span></label><span id="momVal" class="font-mono text-slate-200"></span></div>
+          <input id="momRange" type="range" min="0" max="0.95" step="0.05" value="0.9" />
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1"><label for="epochsRange" class="text-slate-400">Target epochs</label><span id="epochsVal" class="font-mono text-slate-200"></span></div>
+          <input id="epochsRange" type="range" min="100" max="20000" step="100" value="2000" />
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1"><label for="speedRange" class="text-slate-400">Simulation speed</label><span id="speedVal" class="font-mono text-slate-200"></span></div>
+          <input id="speedRange" type="range" min="1" max="100" step="1" value="5" />
+        </div>
+      </section>
+
+      <section class="panel p-4 space-y-3">
+        <h2 class="panel-title">04 · Training</h2>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="stepBtn" class="btn btn-cyan" title="Run one epoch with animated forward + backward pass (S)">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4l10 8-10 8V4z"/><path d="M19 5v14"/></svg>
+            Train Step
+          </button>
+          <button id="runBtn" class="btn btn-emerald" aria-pressed="false" title="Toggle continuous training (Space)">
+            <svg id="runIcon" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>
+            <span id="runLabel">Auto-Run</span>
+          </button>
+        </div>
+        <button id="resetBtn" class="btn btn-ghost w-full" title="Re-initialise weights (R)">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+          Reset Weights
+        </button>
+        <div>
+          <div class="flex justify-between text-[11px] text-slate-500 mb-1"><span>Progress</span><span id="progressText" class="font-mono">0 / 0</span></div>
+          <div class="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+            <div id="progressBar" class="h-full w-0 rounded-full bg-gradient-to-r from-cyan-400 via-purple-500 to-emerald-400 shadow-[0_0_10px_rgba(34,211,238,.8)] transition-[width] duration-150"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel p-4 space-y-3">
+        <h2 class="panel-title">05 · Custom Input (Inference)</h2>
+        <div>
+          <label for="sampleSelect" class="block text-xs text-slate-400 mb-1">Load a training sample</label>
+          <select id="sampleSelect" class="field font-mono text-xs"></select>
+        </div>
+        <div id="customInputs" class="grid grid-cols-2 gap-2"></div>
+        <button id="predictBtn" class="btn btn-purple w-full">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h12"/><path d="M12 6l6 6-6 6"/></svg>
+          Execute Forward Pass
+        </button>
+        <div class="rounded-xl border border-emerald-400/20 bg-emerald-400/5 px-3 py-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-400">Network output <span class="font-mono">ŷ</span></span>
+            <span id="predictOut" class="font-mono text-lg neon-text-emerald">—</span>
+          </div>
+          <div id="predictVec" class="mt-1 text-[11px] font-mono text-slate-400 break-words"></div>
+        </div>
+        <p id="predictHint" class="text-[11px] text-slate-500"></p>
+      </section>
+
+      <section class="panel p-4 space-y-3">
+        <h2 class="panel-title">06 · Visual Options</h2>
+        <label class="flex items-center justify-between text-xs text-slate-300 cursor-pointer">
+          <span>Show neuron &amp; weight values</span>
+          <span class="relative"><input id="optValues" type="checkbox" class="sr-only" checked /><span class="toggle block"></span></span>
+        </label>
+        <label class="flex items-center justify-between text-xs text-slate-300 cursor-pointer">
+          <span>Signal / gradient pulses</span>
+          <span class="relative"><input id="optPulses" type="checkbox" class="sr-only" checked /><span class="toggle block"></span></span>
+        </label>
+        <label class="flex items-center justify-between text-xs text-slate-300 cursor-pointer">
+          <span>Animated weight flow</span>
+          <span class="relative"><input id="optFlow" type="checkbox" class="sr-only" checked /><span class="toggle block"></span></span>
+        </label>
+      </section>
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <main class="flex-1 min-w-0 space-y-4">
+      <section class="grid grid-cols-2 xl:grid-cols-4 gap-3" aria-label="Training metrics">
+        <div class="panel p-4">
+          <div class="panel-title">Epoch</div>
+          <div class="mt-1 flex items-baseline gap-2"><span id="mEpoch" class="text-2xl sm:text-3xl font-bold font-mono neon-text-cyan">0</span><span id="mEpochMax" class="text-xs font-mono text-slate-500"></span></div>
+          <div class="text-[11px] text-slate-500 mt-1"><span id="mEps">0</span> epochs/s</div>
+        </div>
+        <div class="panel p-4">
+          <div class="panel-title">Loss · MSE</div>
+          <div class="mt-1 flex items-baseline gap-2"><span id="mLoss" class="text-2xl sm:text-3xl font-bold font-mono neon-text-purple">—</span></div>
+          <div id="mLossDelta" class="text-[11px] text-slate-500 mt-1">&nbsp;</div>
+        </div>
+        <div class="panel p-4">
+          <div id="mScoreLabel" class="panel-title">Accuracy</div>
+          <div class="mt-1"><span id="mScore" class="text-2xl sm:text-3xl font-bold font-mono neon-text-emerald">—</span></div>
+          <div class="h-1 mt-2 rounded-full bg-slate-800 overflow-hidden"><div id="mScoreBar" class="h-full w-0 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,.9)] transition-[width] duration-200"></div></div>
+          <div id="mScoreSub" class="text-[11px] text-slate-500 mt-1">&nbsp;</div>
+        </div>
+        <div class="panel p-4">
+          <div class="panel-title">Parameters</div>
+          <div class="mt-1"><span id="mParams" class="text-2xl sm:text-3xl font-bold font-mono text-slate-100">0</span></div>
+          <div class="text-[11px] text-slate-500 mt-1"><span id="mWeights">0</span> weights · <span id="mBiases">0</span> biases · <span id="mDepth">0</span> layers</div>
+        </div>
+      </section>
+
+      <section class="panel p-0 overflow-hidden">
+        <div class="flex flex-wrap items-center justify-between gap-3 px-4 pt-4 pb-2">
+          <div class="flex items-center gap-3">
+            <h2 class="panel-title">Deep Network Topology</h2>
+            <span id="phaseChip" class="chip bg-slate-800/70 text-slate-400 border border-slate-600/30">Idle</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400">
+            <span class="flex items-center gap-1.5"><span class="dot bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>Forward signal</span>
+            <span class="flex items-center gap-1.5"><span class="dot bg-rose-400 shadow-[0_0_8px_#fb7185]"></span>Backward gradient</span>
+            <span class="flex items-center gap-1.5"><span class="inline-block w-4 h-0.5 bg-cyan-400"></span>+ weight</span>
+            <span class="flex items-center gap-1.5"><span class="inline-block w-4 h-0.5 bg-purple-500"></span>− weight</span>
+          </div>
+        </div>
+        <div id="nnWrap" class="relative h-[380px] sm:h-[440px] xl:h-[520px] grid-bg border-t border-white/5">
+          <canvas id="nnCanvas" aria-label="Deep neural network diagram" role="img"></canvas>
+          <div id="nnTooltip" class="absolute z-10 opacity-0 max-w-[260px] rounded-xl border border-cyan-400/30 bg-slate-950/95 px-3 py-2 text-[11px] font-mono text-slate-300 shadow-[0_0_24px_-6px_rgba(34,211,238,.6)]"></div>
+          <div class="absolute bottom-2 right-3 text-[10px] text-slate-600">Hover a neuron for details · click to inspect</div>
+        </div>
+      </section>
+
+      <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="panel p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="panel-title">Loss Curve <span class="normal-case tracking-normal text-slate-600">(log scale)</span></h2>
+            <span id="lossNow" class="text-[11px] font-mono text-purple-300"></span>
+          </div>
+          <div class="relative h-64"><canvas id="lossCanvas" aria-label="Loss over epochs" role="img"></canvas></div>
+        </div>
+        <div class="panel p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h2 id="outTitle" class="panel-title">Decision Boundary</h2>
+            <span id="outLegend" class="text-[11px] text-slate-500"></span>
+          </div>
+          <div class="relative h-64"><canvas id="outCanvas" aria-label="Model output space" role="img"></canvas></div>
+        </div>
+      </section>
+
+      <section class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="space-y-4">
+          <div class="panel p-4">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="panel-title">Neuron Inspector</h2>
+              <span id="inspTag" class="text-[11px] font-mono text-cyan-300"></span>
+            </div>
+            <div id="inspector" class="eq text-slate-300 overflow-x-auto thin-scroll"></div>
+          </div>
+          <div class="panel p-4">
+            <h2 class="panel-title mb-3">Equations</h2>
+            <div id="equations" class="eq text-slate-300 space-y-2 overflow-x-auto thin-scroll"></div>
+          </div>
+        </div>
+        <div class="panel p-4 flex flex-col min-h-[320px]">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="panel-title">Computation Log</h2>
+            <button id="clearLogBtn" class="text-[11px] text-slate-500 hover:text-cyan-300 transition">Clear</button>
+          </div>
+          <div id="log" class="log-scroll flex-1 overflow-y-auto font-mono text-[11.5px] leading-relaxed space-y-0.5 rounded-xl bg-slate-950/70 border border-white/5 p-3 max-h-[560px]" aria-live="off"></div>
+        </div>
+      </section>
+
+      <footer class="text-center text-[11px] text-slate-600 py-2">
+        Deep Multi-Layer Perceptron in vanilla JavaScript · SGD with momentum on Mean Squared Error ·
+        <a href="index.html" class="text-cyan-400/80 hover:text-cyan-300">← back to the basic example</a>
+      </footer>
+    </main>
+  </div>
+
+<script>
+'use strict';
+/* =====================================================================
+   NeuroLab — Deep Network Lab
+   Same engine as the basic page, extended with:
+   - 2–4 hidden layers, each with its own width
+   - multi-input / multi-output datasets
+   - SGD with momentum
+   ===================================================================== */
+
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const fmt = (v, d = 3) => (Number.isFinite(v) ? v.toFixed(d) : 'NaN');
+const fmtLoss = (v) => !Number.isFinite(v) ? 'NaN' : (v < 1e-3 ? v.toExponential(2) : v.toFixed(4));
+const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const argmax = (arr) => arr.reduce((best, v, i) => (v > arr[best] ? i : best), 0);
+const SUBSCRIPT = (n) => String(n).split('').map((d) => String.fromCharCode(8320 + +d)).join('');
+
+/* ---------------- Seeded RNG ---------------- */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function gaussian(rng) {
+  let u = 0; while (u === 0) u = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rng());
+}
+
+/* ---------------- Activation functions ---------------- */
+const ACT = {
+  sigmoid: { name: 'Sigmoid', short: 'σ', f: (z) => 1 / (1 + Math.exp(-z)), d: (z, a) => a * (1 - a), eq: 'σ(z) = 1 / (1 + e<sup>−z</sup>)', deq: "σ'(z) = σ(z)·(1 − σ(z))" },
+  tanh: { name: 'Tanh', short: 'tanh', f: (z) => Math.tanh(z), d: (z, a) => 1 - a * a, eq: 'tanh(z) = (e<sup>z</sup> − e<sup>−z</sup>) / (e<sup>z</sup> + e<sup>−z</sup>)', deq: "tanh'(z) = 1 − tanh²(z)" },
+  relu: { name: 'Leaky ReLU', short: 'ReLU', f: (z) => (z > 0 ? z : 0.01 * z), d: (z) => (z > 0 ? 1 : 0.01), eq: 'ReLU(z) = max(0.01·z, z)', deq: "ReLU'(z) = 1 if z &gt; 0 else 0.01" },
+};
+
+/* ---------------- Deep Multi-Layer Perceptron with momentum ---------------- */
+class DeepMLP {
+  constructor(sizes, hiddenAct, outAct, seed) {
+    this.sizes = sizes.slice();
+    this.L = sizes.length;
+    this.hiddenAct = hiddenAct;
+    this.outAct = outAct;
+    const rng = mulberry32(seed);
+    this.W = []; this.b = []; this.vW = []; this.vb = [];
+    for (let l = 0; l < this.L - 1; l++) {
+      const nIn = sizes[l], nOut = sizes[l + 1];
+      const act = l === this.L - 2 ? outAct : hiddenAct;
+      const std = act === 'relu' ? Math.sqrt(2 / nIn) : Math.sqrt(2 / (nIn + nOut)) * (act === 'sigmoid' ? 2 : 1.2);
+      this.W.push(Array.from({ length: nOut }, () => Array.from({ length: nIn }, () => gaussian(rng) * std)));
+      this.b.push(Array.from({ length: nOut }, () => (rng() - 0.5) * 0.2));
+      this.vW.push(Array.from({ length: nOut }, () => new Array(nIn).fill(0)));
+      this.vb.push(new Array(nOut).fill(0));
+    }
+    this.z = sizes.map((n) => new Array(n).fill(0));
+    this.a = sizes.map((n) => new Array(n).fill(0));
+    this.resetGradStats();
+  }
+
+  get paramCount() {
+    let w = 0, b = 0;
+    for (let l = 0; l < this.L - 1; l++) { w += this.sizes[l] * this.sizes[l + 1]; b += this.sizes[l + 1]; }
+    return { w, b, total: w + b };
+  }
+
+  actOf(l) { return ACT[l === this.L - 1 ? this.outAct : this.hiddenAct]; }
+
+  resetGradStats() {
+    this.gradW = this.W.map((Wl) => Wl.map((row) => new Array(row.length).fill(0)));
+    this.nodeGrad = this.sizes.map((n) => new Array(n).fill(0));
+  }
+
+  forward(x, store = true) {
+    const zs = [x.slice()], as = [x.slice()];
+    let a = as[0];
+    for (let l = 0; l < this.L - 1; l++) {
+      const act = this.actOf(l + 1), Wl = this.W[l], bl = this.b[l];
+      const z = new Array(Wl.length), na = new Array(Wl.length);
+      for (let j = 0; j < Wl.length; j++) {
+        let s = bl[j];
+        const row = Wl[j];
+        for (let i = 0; i < row.length; i++) s += row[i] * a[i];
+        z[j] = s; na[j] = act.f(s);
+      }
+      zs.push(z); as.push(na); a = na;
+    }
+    if (store) { this.z = zs; this.a = as; }
+    return { zs, as, out: a };
+  }
+
+  predict(x) { return this.forward(x, false).out; }
+
+  /** One SGD+momentum update on a single sample: v ← βv − η∇, θ ← θ + v. */
+  trainSample(x, y, lr, beta) {
+    const { zs, as } = this.forward(x, false);
+    const L = this.L, out = as[L - 1], oAct = this.actOf(L - 1);
+    let loss = 0;
+    let delta = new Array(out.length);
+    for (let j = 0; j < out.length; j++) {
+      const e = out[j] - y[j];
+      loss += e * e;
+      delta[j] = clamp((2 * e / out.length) * oAct.d(zs[L - 1][j], out[j]), -5, 5);
+    }
+    loss /= out.length;
+
+    for (let l = L - 2; l >= 0; l--) {
+      const Wl = this.W[l], bl = this.b[l], aPrev = as[l], vWl = this.vW[l], vbl = this.vb[l];
+      const ng = this.nodeGrad[l + 1];
+      for (let j = 0; j < delta.length; j++) ng[j] += Math.abs(delta[j]);
+
+      let prevDelta = null;
+      if (l > 0) {
+        const act = this.actOf(l);
+        prevDelta = new Array(aPrev.length);
+        for (let i = 0; i < aPrev.length; i++) {
+          let s = 0;
+          for (let j = 0; j < delta.length; j++) s += Wl[j][i] * delta[j];
+          prevDelta[i] = clamp(s * act.d(zs[l][i], aPrev[i]), -5, 5);
+        }
+      }
+      const gW = this.gradW[l];
+      for (let j = 0; j < delta.length; j++) {
+        const dj = delta[j], row = Wl[j], vRow = vWl[j], gRow = gW[j];
+        for (let i = 0; i < row.length; i++) {
+          const g = dj * aPrev[i];
+          vRow[i] = beta * vRow[i] - lr * g;
+          row[i] += vRow[i];
+          gRow[i] += Math.abs(g);
+        }
+        vbl[j] = beta * vbl[j] - lr * dj;
+        bl[j] += vbl[j];
+      }
+      if (prevDelta) delta = prevDelta;
+    }
+    return loss;
+  }
+
+  trainEpoch(data, lr, beta, rng) {
+    this.resetGradStats();
+    const idx = data.map((_, i) => i);
+    for (let i = idx.length - 1; i > 0; i--) { const k = Math.floor(rng() * (i + 1)); [idx[i], idx[k]] = [idx[k], idx[i]]; }
+    let total = 0;
+    for (const i of idx) total += this.trainSample(data[i].x, data[i].y, lr, beta);
+    const n = data.length;
+    for (const Wl of this.gradW) for (const row of Wl) for (let i = 0; i < row.length; i++) row[i] /= n;
+    for (const ng of this.nodeGrad) for (let i = 0; i < ng.length; i++) ng[i] /= n;
+    return total / n;
+  }
+
+  /** metric: 'bits' (all outputs thresholded must match) or 'argmax' (one-hot class). */
+  evaluate(data, metric) {
+    let loss = 0, correct = 0, bitsOk = 0, bitsTotal = 0;
+    for (const d of data) {
+      const out = this.predict(d.x);
+      let l = 0;
+      for (let j = 0; j < out.length; j++) { const e = out[j] - d.y[j]; l += e * e; }
+      loss += l / out.length;
+      if (metric === 'argmax') {
+        if (argmax(out) === argmax(d.y)) correct++;
+      } else {
+        let all = true;
+        for (let j = 0; j < out.length; j++) {
+          const ok = (out[j] >= 0.5 ? 1 : 0) === d.y[j];
+          bitsOk += ok ? 1 : 0; bitsTotal++;
+          if (!ok) all = false;
+        }
+        if (all) correct++;
+      }
+    }
+    return { loss: loss / data.length, score: correct / data.length, bitScore: bitsTotal ? bitsOk / bitsTotal : NaN };
+  }
+}
+
+/* ---------------- Complex datasets ---------------- */
+// Segments a..g for digits 0–9 (standard 7-segment encoding)
+const SEG7 = [
+  [1, 1, 1, 1, 1, 1, 0], [0, 1, 1, 0, 0, 0, 0], [1, 1, 0, 1, 1, 0, 1], [1, 1, 1, 1, 0, 0, 1], [0, 1, 1, 0, 0, 1, 1],
+  [1, 0, 1, 1, 0, 1, 1], [1, 0, 1, 1, 1, 1, 1], [1, 1, 1, 0, 0, 0, 0], [1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 0, 1, 1],
+];
+const toBits = (n, w) => Array.from({ length: w }, (_, k) => (n >> (w - 1 - k)) & 1);
+const CLASS_COLORS = [[34, 211, 238], [168, 85, 247], [251, 191, 36]];
+
+const DATASETS = {
+  seg7: {
+    name: '7-Segment Display → 4-bit Binary', kind: 'table', metric: 'bits', binaryInputs: true,
+    inLabels: ['a', 'b', 'c', 'd', 'e', 'f', 'g'], outLabels: ['b₃', 'b₂', 'b₁', 'b₀'],
+    desc: 'Seven input neurons read the segments (a–g) of a digital display; four output neurons must emit that digit in binary (8-4-2-1). Requires a deep, wide hidden representation to decode the segment patterns.',
+    preset: { hidden: [10, 8], act: 'tanh', lr: 0.05, momentum: 0.9, epochs: 1500, speed: 5 },
+    gen: () => SEG7.map((seg, d) => ({ x: seg.slice(), y: toBits(d, 4), label: String(d) })),
+    probe: SEG7[5].slice(),
+  },
+  adder: {
+    name: 'Binary Full Adder', kind: 'table', metric: 'bits', binaryInputs: true,
+    inLabels: ['A', 'B', 'Cᵢₙ'], outLabels: ['Sum', 'Cₒᵤₜ'],
+    desc: 'A digital circuit as a neural network: three bits in (A, B, carry-in), two bits out (Sum = A⊕B⊕Cin, Carry = majority). Sum is a 3-way XOR, so depth genuinely helps.',
+    preset: { hidden: [6, 6], act: 'tanh', lr: 0.08, momentum: 0.9, epochs: 1500, speed: 5 },
+    gen: () => Array.from({ length: 8 }, (_, n) => {
+      const [a, b, c] = toBits(n, 3);
+      return { x: [a, b, c], y: [a ^ b ^ c, (a & b) | (a & c) | (b & c)], label: `${a}${b}${c}` };
+    }),
+    probe: [1, 0, 1],
+  },
+  pinwheel: {
+    name: '3-Class Pinwheel', kind: '2d', metric: 'argmax',
+    inLabels: ['x₁', 'x₂'], outLabels: ['C₀', 'C₁', 'C₂'], domain: [-1.2, 1.2],
+    desc: '240 points arranged in three curved arms. Three output neurons (one-hot) each vote for a class; the prediction is the strongest output (argmax). The curved arms need several stacked non-linear layers.',
+    preset: { hidden: [8, 8], act: 'tanh', lr: 0.02, momentum: 0.9, epochs: 1000, speed: 3 },
+    gen: () => {
+      const rng = mulberry32(2024), pts = [];
+      for (let c = 0; c < 3; c++) for (let i = 0; i < 80; i++) {
+        const r = 0.15 + 0.85 * (i / 80) + gaussian(rng) * 0.03;
+        const th = (c * 2 * Math.PI) / 3 + r * 2.2 + gaussian(rng) * 0.12;
+        const y = [0, 0, 0]; y[c] = 1;
+        pts.push({ x: [r * Math.cos(th), r * Math.sin(th)], y, label: `class ${c}` });
+      }
+      return pts;
+    },
+    probe: [0.5, 0.3],
+  },
+  spiral: {
+    name: 'Two Intertwined Spirals', kind: '2d', metric: 'bits',
+    inLabels: ['x₁', 'x₂'], outLabels: ['ŷ'], domain: [-1.2, 1.2],
+    desc: 'The famous benchmark that shallow networks fail: two spirals winding around each other 1.5 times. Three hidden layers carve out the alternating bands. Expect a few thousand epochs.',
+    preset: { hidden: [12, 12, 8], act: 'tanh', lr: 0.01, momentum: 0.9, epochs: 4000, speed: 10 },
+    gen: () => {
+      const rng = mulberry32(99), pts = [];
+      const N = 100;
+      for (let c = 0; c < 2; c++) for (let i = 0; i < N; i++) {
+        const t = i / N;
+        const r = 0.08 + 0.92 * t;
+        const th = t * 3 * Math.PI + c * Math.PI;
+        pts.push({ x: [r * Math.cos(th) + gaussian(rng) * 0.015, r * Math.sin(th) + gaussian(rng) * 0.015], y: [c], label: `spiral ${c}` });
+      }
+      return pts;
+    },
+    probe: [0.3, 0.2],
+  },
+};
+
+/* ---------------- App state ---------------- */
+const S = {
+  dsKey: 'seg7', ds: null, data: [], net: null,
+  epoch: 0, history: [], running: false,
+  lr: 0.05, momentum: 0.9, maxEpochs: 1500, speed: 5, hidden: [10, 8], act: 'tanh',
+  probe: [], seed: 42, rng: mulberry32(99),
+  selected: null,
+  metrics: { loss: NaN, score: NaN, bitScore: NaN },
+  anim: { phase: null, t: 0, queue: [] },
+  opts: { values: true, pulses: true, flow: true },
+  dirty: { out: true, loss: true },
+  lastLog: 0, epsCounter: { t: performance.now(), e: 0, value: 0 },
+  nodePos: [], hover: null,
+};
+
+/* ---------------- Logging ---------------- */
+const LOG_COLORS = { info: 'text-slate-400', fwd: 'text-cyan-300', bwd: 'text-rose-300', ok: 'text-emerald-300', warn: 'text-amber-300', sys: 'text-purple-300' };
+function log(msg, kind = 'info') {
+  const el = $('log');
+  const line = document.createElement('div');
+  line.className = `log-line ${LOG_COLORS[kind] || LOG_COLORS.info}`;
+  const ts = new Date().toLocaleTimeString([], { hour12: false });
+  line.innerHTML = `<span class="text-slate-600">${ts}</span> ${msg}`;
+  el.appendChild(line);
+  while (el.childElementCount > 160) el.removeChild(el.firstChild);
+  el.scrollTop = el.scrollHeight;
+}
+
+/* ---------------- Output interpretation ---------------- */
+function describeOutput(out) {
+  const ds = S.ds;
+  if (ds.metric === 'argmax') return { main: `class ${argmax(out)}`, sub: '' };
+  const bits = out.map((v) => (v >= 0.5 ? 1 : 0));
+  if (S.dsKey === 'seg7') { const n = parseInt(bits.join(''), 2); return { main: `${bits.join('')} = ${n}`, sub: '' }; }
+  if (S.dsKey === 'adder') return { main: `S=${bits[0]} C=${bits[1]}`, sub: '' };
+  return { main: `${fmt(out[0], 3)} → ${bits[0]}`, sub: '' };
+}
+const scoreText = () => {
+  const m = S.metrics;
+  return `acc ${(m.score * 100).toFixed(1)}%${Number.isFinite(m.bitScore) && S.ds.outLabels.length > 1 ? ` · bits ${(m.bitScore * 100).toFixed(1)}%` : ''}`;
+};
+
+/* ---------------- Network construction ---------------- */
+function buildNetwork(newSeed = false) {
+  if (newSeed) S.seed = (Math.random() * 1e9) | 0;
+  const ds = S.ds;
+  const sizes = [ds.inLabels.length, ...S.hidden, ds.outLabels.length];
+  S.net = new DeepMLP(sizes, S.act, 'sigmoid', S.seed);
+  S.rng = mulberry32(S.seed ^ 0x5bd1e995);
+  S.epoch = 0; S.history = [];
+  S.selected = { l: sizes.length - 1, j: 0 };
+  S.anim = { phase: null, t: 0, queue: [] };
+  const ev = S.net.evaluate(S.data, ds.metric);
+  S.metrics = { loss: ev.loss, score: ev.score, bitScore: ev.bitScore, prevLoss: NaN };
+  S.history.push(ev.loss);
+  S.net.forward(S.probe);
+  S.dirty.out = S.dirty.loss = true;
+
+  $('topology').textContent = sizes.join(' → ');
+  $('outActLabel').textContent = `Sigmoid × ${ds.outLabels.length}`;
+  const pc = S.net.paramCount;
+  $('mParams').textContent = pc.total;
+  $('mWeights').textContent = pc.w;
+  $('mBiases').textContent = pc.b;
+  $('mDepth').textContent = sizes.length;
+  log(`Initialised deep MLP [${sizes.join('-')}] · ${S.hidden.length} hidden layers · ${ACT[S.act].name} · ${pc.total} params · seed ${S.seed}`, 'sys');
+  log(`Initial MSE = ${fmtLoss(ev.loss)} · ${scoreText()}`, 'info');
+  updateMetrics(); renderEquations(); renderInspector(); updatePredictionReadout();
+}
+
+function loadDataset(key, applyPreset = true) {
+  S.dsKey = key; S.ds = DATASETS[key];
+  S.data = S.ds.gen();
+  S.probe = S.ds.probe.slice();
+  if (applyPreset) {
+    const p = S.ds.preset;
+    S.hidden = p.hidden.slice(); S.act = p.act; S.lr = p.lr; S.momentum = p.momentum; S.maxEpochs = p.epochs; S.speed = p.speed;
+    syncControls();
+  }
+  $('dsDesc').textContent = S.ds.desc;
+  $('dsCount').textContent = `${S.data.length} samples · ${S.ds.inLabels.length}→${S.ds.outLabels.length}`;
+  if (S.ds.kind === 'table') {
+    $('outTitle').textContent = 'Prediction Matrix';
+    $('outLegend').innerHTML = '<span class="text-cyan-300">■ input</span> &nbsp;<span class="text-slate-300">□ target</span> &nbsp;<span class="text-emerald-300">■ ŷ</span>';
+  } else if (S.ds.metric === 'argmax') {
+    $('outTitle').textContent = 'Decision Regions';
+    $('outLegend').innerHTML = '<span class="text-cyan-300">■ C₀</span> &nbsp;<span class="text-purple-300">■ C₁</span> &nbsp;<span class="text-amber-300">■ C₂</span>';
+  } else {
+    $('outTitle').textContent = 'Decision Boundary';
+    $('outLegend').innerHTML = '<span class="text-purple-300">■ class 0</span> &nbsp;<span class="text-emerald-300">■ class 1</span>';
+  }
+  $('mScoreLabel').textContent = S.ds.metric === 'argmax' ? 'Accuracy (argmax)' : S.ds.outLabels.length > 1 ? 'Accuracy (exact match)' : 'Accuracy';
+  const sel = $('sampleSelect');
+  sel.innerHTML = '<option value="">— choose —</option>' + S.data.slice(0, 40).map((d, i) =>
+    `<option value="${i}">#${i} ${d.label ? `[${d.label}] ` : ''}x=[${d.x.map((v) => (S.ds.binaryInputs ? v : fmt(v, 2))).join(',')}]</option>`).join('');
+  buildCustomInputs();
+  log(`Dataset loaded: <b>${S.ds.name}</b> (${S.data.length} samples, ${S.ds.inLabels.length} inputs → ${S.ds.outLabels.length} outputs)`, 'sys');
+  buildNetwork();
+}
+
+/* ---------------- Controls ---------------- */
+const LR_MIN = 0.001, LR_MAX = 2;
+const lrToSlider = (lr) => Math.round((Math.log(lr / LR_MIN) / Math.log(LR_MAX / LR_MIN)) * 1000);
+const sliderToLr = (v) => +(LR_MIN * Math.pow(LR_MAX / LR_MIN, v / 1000)).toPrecision(3);
+function setFill(range) {
+  const pct = ((range.value - range.min) / (range.max - range.min)) * 100;
+  range.style.setProperty('--fill', pct + '%');
+}
+
+function renderLayerSliders() {
+  const wrap = $('layerSliders');
+  wrap.innerHTML = S.hidden.map((n, k) => `
+    <div>
+      <div class="flex justify-between text-xs mb-1"><label for="hl${k}" class="text-purple-200/80">Hidden ${k + 1} neurons</label><span id="hlv${k}" class="font-mono text-slate-200">${n}</span></div>
+      <input id="hl${k}" data-k="${k}" class="purple" type="range" min="2" max="12" step="1" value="${n}" />
+    </div>`).join('');
+  wrap.querySelectorAll('input[type=range]').forEach((r) => {
+    setFill(r);
+    r.addEventListener('input', (e) => {
+      const k = +e.target.dataset.k;
+      S.hidden[k] = +e.target.value;
+      $(`hlv${k}`).textContent = S.hidden[k];
+      setFill(e.target);
+      setRunning(false); buildNetwork();
+    });
+  });
+}
+
+function syncControls() {
+  $('datasetSelect').value = S.dsKey;
+  $('layersRange').value = S.hidden.length; $('layersVal').textContent = S.hidden.length;
+  renderLayerSliders();
+  $('actSelect').value = S.act;
+  $('lrRange').value = lrToSlider(S.lr); $('lrNumber').value = S.lr;
+  $('momRange').value = S.momentum; $('momVal').textContent = S.momentum.toFixed(2);
+  $('epochsRange').value = S.maxEpochs; $('epochsVal').textContent = S.maxEpochs.toLocaleString();
+  $('speedRange').value = S.speed; $('speedVal').textContent = `${S.speed} epoch${S.speed > 1 ? 's' : ''}/frame`;
+  document.querySelectorAll('input[type=range]').forEach(setFill);
+}
+
+function buildCustomInputs() {
+  const wrap = $('customInputs');
+  const ds = S.ds;
+  wrap.innerHTML = '';
+  if (ds.binaryInputs) {
+    wrap.className = `grid ${ds.inLabels.length > 4 ? 'grid-cols-7' : 'grid-cols-3'} gap-1.5`;
+    ds.inLabels.forEach((lab, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.id = `in${i}`;
+      b.className = `bit ${S.probe[i] ? 'on' : ''}`;
+      b.dataset.v = S.probe[i];
+      b.setAttribute('aria-pressed', String(!!S.probe[i]));
+      b.title = `Toggle ${lab}`;
+      b.innerHTML = `<div class="text-[10px] opacity-70">${lab}</div><div>${S.probe[i]}</div>`;
+      b.addEventListener('click', () => {
+        const v = b.dataset.v === '1' ? 0 : 1;
+        b.dataset.v = v; b.classList.toggle('on', !!v); b.setAttribute('aria-pressed', String(!!v));
+        b.lastElementChild.textContent = v;
+        runPrediction();
+      });
+      wrap.appendChild(b);
+    });
+  } else {
+    wrap.className = 'grid grid-cols-2 gap-2';
+    ds.inLabels.forEach((lab, i) => {
+      const div = document.createElement('div');
+      div.innerHTML = `<label for="in${i}" class="block text-xs text-slate-400 mb-1 font-mono">${lab}</label>
+        <input id="in${i}" type="number" step="0.1" class="field font-mono" value="${S.probe[i]}" />`;
+      wrap.appendChild(div);
+    });
+    wrap.querySelectorAll('input').forEach((inp) => inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') runPrediction(); }));
+  }
+  $('predictHint').textContent = {
+    seg7: 'Click segments a–g to light them up (a = top, then clockwise, g = middle). The network reads the pattern and outputs the digit in binary.',
+    adder: 'Toggle A, B and carry-in. Expected: Sum = A⊕B⊕Cin, Carry = at least two inputs set.',
+    pinwheel: 'Enter any point in [−1.2, 1.2]². The crosshair on the region map shows where it lands.',
+    spiral: 'Enter any point in [−1.2, 1.2]². ŷ ≥ 0.5 → spiral 1.',
+  }[S.dsKey];
+}
+
+function setProbeInputs(x) {
+  S.probe = x.slice();
+  S.ds.inLabels.forEach((_, i) => {
+    const el = $(`in${i}`);
+    if (S.ds.binaryInputs) {
+      el.dataset.v = x[i]; el.classList.toggle('on', !!x[i]); el.setAttribute('aria-pressed', String(!!x[i]));
+      el.lastElementChild.textContent = x[i];
+    } else el.value = +x[i].toFixed(3);
+  });
+}
+
+function readProbe() {
+  return S.ds.inLabels.map((_, i) => {
+    const el = $(`in${i}`);
+    if (S.ds.binaryInputs) return +el.dataset.v;
+    const v = parseFloat(el.value);
+    return Number.isFinite(v) ? clamp(v, -10, 10) : 0;
+  });
+}
+
+function updatePredictionReadout() {
+  if (!S.net) return;
+  const out = S.net.predict(S.probe);
+  $('predictOut').textContent = describeOutput(out).main;
+  $('predictVec').innerHTML = out.map((v, j) => `${S.ds.outLabels[j]}=<span class="${v >= 0.5 ? 'text-emerald-300' : 'text-slate-500'}">${fmt(v, 3)}</span>`).join(' · ');
+}
+
+function setRunning(on) {
+  if (on && S.epoch >= S.maxEpochs) {
+    log(`Target of ${S.maxEpochs} epochs reached — raise “Target epochs” or reset weights to continue.`, 'warn');
+    on = false;
+  }
+  const was = S.running;
+  S.running = on;
+  const btn = $('runBtn');
+  btn.classList.toggle('active', on);
+  btn.setAttribute('aria-pressed', String(on));
+  $('runLabel').textContent = on ? 'Pause' : 'Auto-Run';
+  $('runIcon').innerHTML = on ? '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>' : '<path d="M7 4v16l13-8z"/>';
+  $('stepBtn').disabled = on;
+  setStatus(on ? 'training' : (S.epoch >= S.maxEpochs ? 'done' : 'idle'));
+  if (on) {
+    log(`▶ Auto-run started · η=${S.lr} · β=${S.momentum} · ${S.speed} epoch(s)/frame`, 'sys');
+    if (!S.anim.phase) S.anim = { phase: 'fwd', t: 0, queue: ['bwd'] };
+  } else if (was && S.epoch > 0) {
+    log(`⏸ Paused at epoch ${S.epoch} · MSE ${fmtLoss(S.metrics.loss)}`, 'sys');
+  }
+  if (!on && S.net) { updateMetrics(); renderInspector(); updatePredictionReadout(); }
+}
+
+function setStatus(state) {
+  const map = {
+    idle: ['Idle', 'bg-slate-400', 'bg-slate-800/80 text-slate-300 border-slate-600/40', false],
+    training: ['Training', 'bg-emerald-400 shadow-[0_0_8px_#34d399]', 'bg-emerald-400/10 text-emerald-300 border-emerald-400/40', true],
+    done: ['Converged', 'bg-cyan-400 shadow-[0_0_8px_#22d3ee]', 'bg-cyan-400/10 text-cyan-300 border-cyan-400/40', false],
+    error: ['Diverged', 'bg-rose-400', 'bg-rose-400/10 text-rose-300 border-rose-400/40', false],
+  };
+  const [text, dot, chip, pulse] = map[state];
+  $('statusText').textContent = text;
+  $('statusDot').className = `dot ${dot} ${pulse ? 'pulse-dot' : ''}`;
+  $('statusChip').className = `chip border ${chip}`;
+}
+
+/* ---------------- Training ---------------- */
+function doEpoch() {
+  const loss = S.net.trainEpoch(S.data, S.lr, S.momentum, S.rng);
+  S.epoch++;
+  return Number.isFinite(loss);
+}
+
+function afterTraining() {
+  const ev = S.net.evaluate(S.data, S.ds.metric);
+  S.metrics.prevLoss = S.metrics.loss;
+  S.metrics.loss = ev.loss; S.metrics.score = ev.score; S.metrics.bitScore = ev.bitScore;
+  S.history.push(ev.loss);
+  S.net.forward(S.probe);
+  S.dirty.out = S.dirty.loss = true;
+  if (!Number.isFinite(ev.loss)) {
+    setRunning(false); setStatus('error');
+    log('✖ Loss diverged to NaN/∞ — lower the learning rate or momentum and reset weights.', 'warn');
+  }
+}
+
+function trainStep() {
+  if (S.running) return;
+  if (S.epoch >= S.maxEpochs) { log(`Target of ${S.maxEpochs} epochs reached — raise the target or reset.`, 'warn'); return; }
+  S.probe = readProbe();
+  const net = S.net, L = net.L;
+  const fw = net.forward(S.probe);
+  doEpoch();
+  afterTraining();
+  const flat = net.gradW.flat(2);
+  const gMax = Math.max(...flat), gMean = flat.reduce((s, v) => s + v, 0) / flat.length;
+  const chain = fw.as.slice(1, -1).map((a, k) => `h${k + 1}[${a.length}]`).join(' → ');
+  log(`Epoch ${S.epoch} ▸ forward: x[${S.probe.length}] → ${chain} → ŷ=[${fw.out.map((v) => fmt(v, 3)).join(', ')}]`, 'fwd');
+  log(`Epoch ${S.epoch} ▸ loss: MSE = (1/${S.data.length})Σ‖ŷ−y‖²/${S.ds.outLabels.length} = ${fmtLoss(S.metrics.loss)} · ${scoreText()}`, 'info');
+  const perLayer = net.nodeGrad.slice(1).map((g, k) => `${k + 1 === L - 1 ? 'out' : 'h' + (k + 1)}:${(g.reduce((s, v) => s + v, 0) / g.length).toExponential(1)}`).reverse().join(' ← ');
+  log(`Epoch ${S.epoch} ◂ backprop mean|δ| ${perLayer}`, 'bwd');
+  log(`Epoch ${S.epoch} ◂ update: mean|∂L/∂W|=${gMean.toExponential(2)} · max=${gMax.toExponential(2)} · ${net.paramCount.total} params (η=${S.lr}, β=${S.momentum})`, 'bwd');
+  S.anim = { phase: 'fwd', t: 0, queue: ['bwd'] };
+  if (S.epoch >= S.maxEpochs) onTargetReached();
+  updateMetrics(); renderInspector(); updatePredictionReadout();
+}
+
+function onTargetReached() {
+  setRunning(false);
+  setStatus('done');
+  log(`✔ Training complete · ${S.epoch} epochs · MSE ${fmtLoss(S.metrics.loss)} · ${scoreText()}`, 'ok');
+}
+
+function runPrediction() {
+  S.probe = readProbe();
+  const fw = S.net.forward(S.probe);
+  const d = describeOutput(fw.out);
+  let msg = `Inference x=[${S.probe.map((v) => (S.ds.binaryInputs ? v : fmt(v, 2))).join(', ')}] → ŷ=[${fw.out.map((v) => fmt(v, 3)).join(', ')}] ⇒ <b>${d.main}</b>`;
+  const match = S.data.find((s) => s.x.every((v, i) => Math.abs(v - S.probe[i]) < 1e-9));
+  if (match) msg += ` (target ${S.ds.metric === 'argmax' ? `class ${argmax(match.y)}` : match.y.join('')}${match.label ? `, sample “${match.label}”` : ''})`;
+  else if (S.dsKey === 'seg7') msg += ' (pattern not a valid digit — the network extrapolates)';
+  log(msg, 'fwd');
+  if (!S.running) S.anim = { phase: 'fwd', t: 0, queue: [] };
+  S.dirty.out = true;
+  updatePredictionReadout(); renderInspector();
+}
+
+/* ---------------- Metrics / text panels ---------------- */
+function updateMetrics() {
+  $('mEpoch').textContent = S.epoch.toLocaleString();
+  $('mEpochMax').textContent = `/ ${S.maxEpochs.toLocaleString()}`;
+  $('mLoss').textContent = fmtLoss(S.metrics.loss);
+  $('lossNow').textContent = `MSE ${fmtLoss(S.metrics.loss)}`;
+  const { prevLoss, loss } = S.metrics;
+  if (Number.isFinite(prevLoss) && Number.isFinite(loss) && prevLoss > 0) {
+    const d = ((loss - prevLoss) / prevLoss) * 100;
+    $('mLossDelta').innerHTML = d <= 0
+      ? `<span class="text-emerald-400">▼ ${Math.abs(d).toFixed(2)}%</span> vs last update`
+      : `<span class="text-rose-400">▲ ${d.toFixed(2)}%</span> vs last update`;
+  } else $('mLossDelta').innerHTML = '&nbsp;';
+  const sc = S.metrics.score;
+  $('mScore').textContent = Number.isFinite(sc) ? `${(sc * 100).toFixed(1)}%` : '—';
+  $('mScoreBar').style.width = `${clamp(Number.isFinite(sc) ? sc : 0, 0, 1) * 100}%`;
+  $('mScoreSub').innerHTML = S.ds.metric === 'bits' && S.ds.outLabels.length > 1 && Number.isFinite(S.metrics.bitScore)
+    ? `per-bit ${(S.metrics.bitScore * 100).toFixed(1)}%` : '&nbsp;';
+  $('progressText').textContent = `${S.epoch.toLocaleString()} / ${S.maxEpochs.toLocaleString()}`;
+  $('progressBar').style.width = `${clamp(S.epoch / S.maxEpochs, 0, 1) * 100}%`;
+  $('mEps').textContent = S.epsCounter.value.toLocaleString();
+}
+
+function renderEquations() {
+  const h = ACT[S.act], L = S.hidden.length + 1;
+  const chain = ['x', ...S.hidden.map((_, k) => `a<sup>(${k + 1})</sup>`), 'ŷ'].join(' → ');
+  $('equations').innerHTML = `
+    <div><span class="text-cyan-300">Chain</span>&nbsp;&nbsp;&nbsp; ${chain}&nbsp;&nbsp;<span class="text-slate-500">(${L} weight matrices)</span></div>
+    <div><span class="text-cyan-300">Forward</span>&nbsp; z<sup>(l)</sup> = W<sup>(l)</sup>·a<sup>(l−1)</sup> + b<sup>(l)</sup>,&nbsp; a<sup>(l)</sup> = g(z<sup>(l)</sup>),&nbsp; l = 1…${L}</div>
+    <div><span class="text-purple-300">Hidden</span>&nbsp;&nbsp; ${h.eq}&nbsp;&nbsp;<span class="text-slate-500">${h.deq}</span></div>
+    <div><span class="text-emerald-300">Output</span>&nbsp;&nbsp; ŷ<sub>k</sub> = σ(z<sub>k</sub><sup>(${L})</sup>),&nbsp; k = 1…${S.ds.outLabels.length}</div>
+    <div><span class="text-slate-400">Loss</span>&nbsp;&nbsp;&nbsp;&nbsp; MSE = (1/n) Σ<sub>samples</sub> (1/K) Σ<sub>k</sub> (ŷ<sub>k</sub> − y<sub>k</sub>)²</div>
+    <div><span class="text-rose-300">Backprop</span> δ<sup>(${L})</sup> = (2/K)(ŷ − y) ⊙ σ′(z<sup>(${L})</sup>),&nbsp; δ<sup>(l)</sup> = (W<sup>(l+1)</sup>)<sup>T</sup>δ<sup>(l+1)</sup> ⊙ g′(z<sup>(l)</sup>)</div>
+    <div><span class="text-amber-300">Momentum</span> v ← β·v − η·δ·a<sup>T</sup>,&nbsp; W ← W + v&nbsp;&nbsp;<span class="text-slate-500">(η = ${S.lr}, β = ${S.momentum})</span></div>`;
+}
+
+function layerName(l, L) { return l === 0 ? 'Input' : l === L - 1 ? 'Output' : `Hidden ${l}`; }
+function neuronLabel(l, j) {
+  if (l === 0) return S.ds.inLabels[j];
+  if (l === S.net.L - 1) return S.ds.outLabels[j];
+  return `h${l}${SUBSCRIPT(j + 1)}`;
+}
+
+function renderInspector() {
+  const net = S.net, sel = S.selected;
+  if (!net || !sel) return;
+  const { l, j } = sel, L = net.L;
+  $('inspTag').textContent = `${layerName(l, L)} · ${neuronLabel(l, j)}`;
+  if (l === 0) {
+    $('inspector').innerHTML = `<div><span class="text-cyan-300">${neuronLabel(0, j)}</span> = ${fmt(net.a[0][j], 4)} <span class="text-slate-500">(input neuron — passes its value forward unchanged)</span></div>
+      <div class="mt-2 text-slate-500">Outgoing weights: ${net.W[0].map((row, k) => `<span class="${row[j] >= 0 ? 'text-cyan-300' : 'text-purple-300'}">${fmt(row[j])}</span>→${neuronLabel(1, k)}`).join(', ')}</div>`;
+    return;
+  }
+  const act = net.actOf(l), w = net.W[l - 1][j], b = net.b[l - 1][j], aPrev = net.a[l - 1];
+  const terms = w.map((wi, i) => `<span class="${wi >= 0 ? 'text-cyan-300' : 'text-purple-300'}">(${fmt(wi)})</span>·<span class="text-slate-400">${fmt(aPrev[i])}</span>`);
+  const shown = terms.length > 8 ? terms.slice(0, 8).join(' + ') + ` + … <span class="text-slate-500">(${terms.length} terms)</span>` : terms.join(' + ');
+  const z = net.z[l][j], a = net.a[l][j];
+  $('inspector').innerHTML = `
+    <div class="text-slate-500">Probe input x = [${S.probe.map((v) => fmt(v, 2)).join(', ')}] · receives from ${layerName(l - 1, L)} (${aPrev.length} neurons)</div>
+    <div class="mt-1">z = ${shown} + <span class="text-amber-300">b(${fmt(b)})</span></div>
+    <div>&nbsp;&nbsp;= <span class="text-slate-100">${fmt(z, 4)}</span></div>
+    <div class="mt-1">a = ${act.short}(${fmt(z, 4)}) = <span class="neon-text-emerald">${fmt(a, 4)}</span>${l < L - 1 ? ` <span class="text-slate-500">→ feeds ${net.sizes[l + 1]} neurons in ${layerName(l + 1, L)}</span>` : ''}</div>
+    <div class="mt-1 text-rose-300">mean |δ| (last epoch) = ${net.nodeGrad[l][j].toExponential(3)}</div>`;
+}
+
+/* =====================================================================
+   CANVAS RENDERING
+   ===================================================================== */
+function fitCanvas(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(1, Math.round(rect.width * dpr)), h = Math.max(1, Math.round(rect.height * dpr));
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: rect.width, h: rect.height };
+}
+
+const COLORS = { cyan: [34, 211, 238], purple: [168, 85, 247], violet: [192, 132, 252], emerald: [52, 211, 153], rose: [251, 113, 133], amber: [251, 191, 36] };
+const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+const layerColor = (l, L) => (l === 0 ? COLORS.cyan : l === L - 1 ? COLORS.emerald : (l % 2 ? COLORS.purple : COLORS.violet));
+
+function computeLayout(w, h) {
+  const net = S.net, L = net.L;
+  const maxN = Math.max(...net.sizes);
+  const top = 46, bottom = 34;
+  const usableH = h - top - bottom;
+  const r = clamp(Math.min(usableH / (maxN * 2.6), (w / L) / 5.5), 6, 22);
+  const padX = clamp(w * 0.08, r * 2.8, 100);
+  const pos = [];
+  for (let l = 0; l < L; l++) {
+    const n = net.sizes[l];
+    const x = padX + (l * (w - 2 * padX)) / (L - 1);
+    const spacing = Math.min(usableH / n, r * 3.4);
+    const startY = top + usableH / 2 - (spacing * (n - 1)) / 2;
+    pos.push(Array.from({ length: n }, (_, j) => ({ x, y: startY + j * spacing, r })));
+  }
+  return pos;
+}
+
+function drawNetwork(time) {
+  const { ctx, w, h } = fitCanvas($('nnCanvas'));
+  const net = S.net, L = net.L;
+  ctx.clearRect(0, 0, w, h);
+  const pos = computeLayout(w, h);
+  S.nodePos = pos;
+  const anim = S.anim;
+  const segs = L - 1;
+
+  let fwdSeg = -1, bwdSeg = -1, frac = 0;
+  if (anim.phase === 'fwd') { fwdSeg = Math.min(Math.floor(anim.t), segs - 1); frac = easeInOut(clamp(anim.t - fwdSeg, 0, 1)); }
+  if (anim.phase === 'bwd') { const k = Math.min(Math.floor(anim.t), segs - 1); bwdSeg = segs - 1 - k; frac = easeInOut(clamp(anim.t - k, 0, 1)); }
+
+  let maxW = 1e-9, maxG = 1e-12;
+  for (let l = 0; l < segs; l++) for (const row of net.W[l]) for (const v of row) maxW = Math.max(maxW, Math.abs(v));
+  for (let l = 0; l < segs; l++) for (const row of net.gradW[l]) for (const v of row) maxG = Math.max(maxG, v);
+  const wScale = Math.max(1.5, maxW);
+  const totalEdges = net.paramCount.w;
+  const dense = totalEdges > 120;
+
+  ctx.lineCap = 'round';
+  for (let l = 0; l < segs; l++) {
+    const Wl = net.W[l], gl = net.gradW[l];
+    for (let j = 0; j < Wl.length; j++) {
+      for (let i = 0; i < Wl[j].length; i++) {
+        const wv = Wl[j][i], aw = Math.abs(wv) / wScale;
+        const p0 = pos[l][i], p1 = pos[l + 1][j];
+        const col = wv >= 0 ? COLORS.cyan : COLORS.purple;
+        ctx.strokeStyle = rgba(col, (dense ? 0.07 : 0.12) + 0.5 * aw);
+        ctx.lineWidth = 0.5 + (dense ? 2.2 : 3) * aw;
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+
+        if (S.opts.flow && !prefersReducedMotion && aw > (dense ? 0.25 : 0)) {
+          const dir = anim.phase === 'bwd' ? 1 : -1;
+          ctx.setLineDash([3, 11]);
+          ctx.lineDashOffset = (dir * time * 0.025) % 14;
+          ctx.strokeStyle = rgba(col, 0.2 + 0.5 * aw);
+          ctx.lineWidth = 0.8 + 1.4 * aw;
+          ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        if (l === bwdSeg) {
+          const g = gl[j][i] / maxG;
+          if (g > 0.04) {
+            ctx.strokeStyle = rgba(COLORS.rose, 0.12 + 0.55 * g * (1 - Math.abs(frac - 0.5)));
+            ctx.lineWidth = 1 + 2.5 * g;
+            ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+          }
+        }
+      }
+    }
+  }
+
+  // highlight the hidden-layer hand-off band currently being processed
+  const activeSeg = anim.phase === 'fwd' ? fwdSeg : anim.phase === 'bwd' ? bwdSeg : -1;
+  if (activeSeg >= 0) {
+    const x0 = pos[activeSeg][0].x, x1 = pos[activeSeg + 1][0].x;
+    const g = ctx.createLinearGradient(x0, 0, x1, 0);
+    const c = anim.phase === 'fwd' ? COLORS.cyan : COLORS.rose;
+    g.addColorStop(0, rgba(c, 0)); g.addColorStop(0.5, rgba(c, 0.05)); g.addColorStop(1, rgba(c, 0));
+    ctx.fillStyle = g; ctx.fillRect(x0, 40, x1 - x0, h - 72);
+  }
+
+  if (S.opts.values && totalEdges <= 30) {
+    ctx.font = '500 9.5px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let l = 0; l < segs; l++) {
+      const Wl = net.W[l];
+      for (let j = 0; j < Wl.length; j++) for (let i = 0; i < Wl[j].length; i++) {
+        const p0 = pos[l][i], p1 = pos[l + 1][j];
+        const x = lerp(p0.x, p1.x, 0.32), y = lerp(p0.y, p1.y, 0.32);
+        const txt = fmt(Wl[j][i], 2);
+        const tw = ctx.measureText(txt).width + 6;
+        ctx.fillStyle = 'rgba(2,6,23,0.85)'; ctx.fillRect(x - tw / 2, y - 6.5, tw, 13);
+        ctx.fillStyle = Wl[j][i] >= 0 ? '#67e8f9' : '#d8b4fe'; ctx.fillText(txt, x, y);
+      }
+    }
+  }
+
+  if (S.opts.pulses && anim.phase) {
+    if (anim.phase === 'fwd' && fwdSeg >= 0) {
+      const l = fwdSeg, Wl = net.W[l], aPrev = net.a[l];
+      let maxC = 1e-9;
+      for (let j = 0; j < Wl.length; j++) for (let i = 0; i < Wl[j].length; i++) maxC = Math.max(maxC, Math.abs(Wl[j][i] * aPrev[i]));
+      for (let j = 0; j < Wl.length; j++) for (let i = 0; i < Wl[j].length; i++) {
+        const c = Math.abs(Wl[j][i] * aPrev[i]) / maxC;
+        if (dense && c < 0.08) continue;
+        const p0 = pos[l][i], p1 = pos[l + 1][j];
+        drawPulse(ctx, lerp(p0.x, p1.x, frac), lerp(p0.y, p1.y, frac), 1.4 + 3 * c, Wl[j][i] >= 0 ? COLORS.cyan : COLORS.purple, 0.3 + 0.7 * c, p1.x - p0.x, p1.y - p0.y);
+      }
+    } else if (anim.phase === 'bwd' && bwdSeg >= 0) {
+      const l = bwdSeg, gl = net.gradW[l];
+      for (let j = 0; j < gl.length; j++) for (let i = 0; i < gl[j].length; i++) {
+        const g = clamp(gl[j][i] / maxG, 0, 1);
+        if (dense && g < 0.05) continue;
+        const p0 = pos[l + 1][j], p1 = pos[l][i];
+        drawPulse(ctx, lerp(p0.x, p1.x, frac), lerp(p0.y, p1.y, frac), 1.3 + 3.2 * Math.sqrt(g), g > 0.5 ? COLORS.amber : COLORS.rose, 0.3 + 0.7 * Math.sqrt(g), p1.x - p0.x, p1.y - p0.y);
+      }
+    }
+  }
+
+  let maxNG = 1e-12;
+  for (let l = 1; l < L; l++) for (const v of net.nodeGrad[l]) maxNG = Math.max(maxNG, v);
+  for (let l = 0; l < L; l++) {
+    const col = layerColor(l, L);
+    const acts = net.a[l];
+    const maxA = Math.max(1, ...acts.map(Math.abs));
+    let lit = 1;
+    if (anim.phase === 'fwd') lit = l <= fwdSeg ? 1 : l === fwdSeg + 1 ? 0.35 + 0.65 * frac : 0.35;
+    for (let j = 0; j < pos[l].length; j++) {
+      const p = pos[l][j];
+      const inten = clamp(Math.abs(acts[j]) / maxA, 0, 1);
+      const glow = (0.25 + 0.75 * inten) * lit;
+
+      ctx.save();
+      ctx.shadowColor = rgba(col, 0.9); ctx.shadowBlur = 6 + 20 * glow;
+      ctx.fillStyle = '#060b1a';
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+
+      const grd = ctx.createRadialGradient(p.x - p.r * 0.3, p.y - p.r * 0.3, p.r * 0.1, p.x, p.y, p.r);
+      grd.addColorStop(0, rgba(col, 0.25 + 0.75 * glow));
+      grd.addColorStop(1, rgba(col, 0.06 + 0.25 * glow));
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = rgba(col, 0.6 + 0.4 * glow); ctx.stroke();
+
+      if (l > 0) {
+        const g = net.nodeGrad[l][j] / maxNG;
+        const strong = anim.phase === 'bwd' && (bwdSeg + 1 === l || bwdSeg === l);
+        if (g > 0.01) {
+          ctx.strokeStyle = rgba(COLORS.rose, strong ? 0.35 + 0.65 * g : 0.08 + 0.25 * g);
+          ctx.lineWidth = strong ? 2.5 : 1.5;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(g, 0.05, 1)); ctx.stroke();
+        }
+      }
+
+      const isSel = S.selected && S.selected.l === l && S.selected.j === j;
+      const isHov = S.hover && S.hover.l === l && S.hover.j === j;
+      if (isSel || isHov) {
+        ctx.setLineDash(isSel ? [4, 3] : []);
+        ctx.strokeStyle = isSel ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.45)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 8, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      if (S.opts.values && p.r >= 12) {
+        ctx.font = `600 ${p.r >= 17 ? 10 : 8.5}px "JetBrains Mono", monospace`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = glow > 0.6 ? '#020617' : '#e2e8f0';
+        ctx.fillText(fmt(acts[j], 2), p.x, p.y + 0.5);
+      }
+      if (l === 0 || l === L - 1) {
+        ctx.font = '600 11px "JetBrains Mono", monospace';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = rgba(col, 0.95);
+        ctx.textAlign = l === 0 ? 'right' : 'left';
+        let lab = neuronLabel(l, j);
+        if (l === L - 1 && S.opts.values && p.r < 12) lab += ` ${fmt(acts[j], 2)}`;
+        ctx.fillText(lab, l === 0 ? p.x - p.r - 10 : p.x + p.r + 10, p.y);
+      }
+    }
+    const x = pos[l][0].x;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.font = '600 10px Inter, sans-serif';
+    ctx.fillStyle = rgba(col, 0.9);
+    ctx.fillText(layerName(l, L).toUpperCase(), x, 20);
+    ctx.font = '500 9.5px "JetBrains Mono", monospace';
+    ctx.fillStyle = 'rgba(148,163,184,0.7)';
+    ctx.fillText(l === 0 ? `${net.sizes[l]} features` : `${net.sizes[l]} · ${net.actOf(l).name}`, x, 34);
+  }
+
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  if (anim.phase) {
+    const isF = anim.phase === 'fwd';
+    const seg = isF ? fwdSeg : bwdSeg;
+    ctx.font = '600 10px "JetBrains Mono", monospace';
+    ctx.fillStyle = isF ? 'rgba(103,232,249,0.9)' : 'rgba(253,164,175,0.9)';
+    ctx.fillText(isF
+      ? `FORWARD PROPAGATION  ▶▶  ${layerName(seg, L)} → ${layerName(seg + 1, L)}`
+      : `◀◀  BACKPROPAGATION  ∂L/∂W  ${layerName(seg + 1, L)} → ${layerName(seg, L)}`, 12, h - 12);
+  }
+}
+
+function drawPulse(ctx, x, y, r, col, alpha, dx, dy) {
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  for (let k = 3; k >= 1; k--) {
+    ctx.fillStyle = rgba(col, alpha * 0.12 * (4 - k));
+    ctx.beginPath(); ctx.arc(x - ux * k * r * 1.4, y - uy * k * r * 1.4, r * (1 - k * 0.15), 0, Math.PI * 2); ctx.fill();
+  }
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r * 2.8);
+  g.addColorStop(0, rgba(col, alpha * 0.55)); g.addColorStop(1, rgba(col, 0));
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r * 2.8, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+  ctx.beginPath(); ctx.arc(x, y, r * 0.55, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = rgba(col, alpha);
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+}
+
+/* ---------- Loss chart ---------- */
+function drawLoss() {
+  const { ctx, w, h } = fitCanvas($('lossCanvas'));
+  ctx.clearRect(0, 0, w, h);
+  const hist = S.history.filter(Number.isFinite);
+  const m = { l: 46, r: 10, t: 10, b: 24 };
+  const pw = w - m.l - m.r, ph = h - m.t - m.b;
+  if (pw <= 0 || ph <= 0) return;
+  const minV = Math.max(1e-6, Math.min(...hist, 1));
+  const maxV = Math.max(...hist, 1e-5);
+  let lo = Math.floor(Math.log10(minV)), hi = Math.ceil(Math.log10(maxV));
+  if (hi <= lo) hi = lo + 1;
+  const yOf = (v) => m.t + ph - ((Math.log10(Math.max(v, 1e-6)) - lo) / (hi - lo)) * ph;
+  const n = Math.max(hist.length - 1, 1);
+  const xOf = (i) => m.l + (i / n) * pw;
+
+  ctx.font = '9.5px "JetBrains Mono", monospace';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let e = lo; e <= hi; e++) {
+    const y = yOf(Math.pow(10, e));
+    ctx.strokeStyle = 'rgba(148,163,184,0.10)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(m.l + pw, y); ctx.stroke();
+    ctx.fillStyle = 'rgba(148,163,184,0.6)'; ctx.fillText(`1e${e}`, m.l - 6, y);
+  }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let k = 0; k <= 4; k++) {
+    const i = Math.round((k / 4) * n);
+    ctx.fillStyle = 'rgba(148,163,184,0.6)'; ctx.fillText(String(i), xOf(i), m.t + ph + 6);
+  }
+  if (hist.length < 2) {
+    ctx.fillStyle = 'rgba(148,163,184,0.5)'; ctx.font = '12px Inter, sans-serif'; ctx.textBaseline = 'middle';
+    ctx.fillText('Train the network to see the loss curve', m.l + pw / 2, m.t + ph / 2);
+    return;
+  }
+  const step = Math.max(1, Math.floor(hist.length / (pw * 1.5)));
+  const pts = [];
+  for (let i = 0; i < hist.length; i += step) pts.push([xOf(i), yOf(hist[i])]);
+  pts.push([xOf(hist.length - 1), yOf(hist[hist.length - 1])]);
+
+  const fill = ctx.createLinearGradient(0, m.t, 0, m.t + ph);
+  fill.addColorStop(0, 'rgba(168,85,247,0.28)'); fill.addColorStop(1, 'rgba(34,211,238,0.0)');
+  ctx.beginPath(); ctx.moveTo(pts[0][0], m.t + ph);
+  pts.forEach(([x, y]) => ctx.lineTo(x, y));
+  ctx.lineTo(pts[pts.length - 1][0], m.t + ph); ctx.closePath();
+  ctx.fillStyle = fill; ctx.fill();
+  const stroke = ctx.createLinearGradient(m.l, 0, m.l + pw, 0);
+  stroke.addColorStop(0, '#a855f7'); stroke.addColorStop(1, '#22d3ee');
+  ctx.save();
+  ctx.shadowColor = 'rgba(168,85,247,0.8)'; ctx.shadowBlur = 10;
+  ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+  ctx.beginPath(); pts.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+  ctx.restore();
+  const [hx, hy] = pts[pts.length - 1];
+  ctx.fillStyle = '#22d3ee'; ctx.beginPath(); ctx.arc(hx, hy, 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(34,211,238,0.4)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(hx, hy, 5, 0, Math.PI * 2); ctx.stroke();
+}
+
+/* ---------- Output space ---------- */
+const heatCanvas = document.createElement('canvas');
+function drawOutput() {
+  const { ctx, w, h } = fitCanvas($('outCanvas'));
+  ctx.clearRect(0, 0, w, h);
+  if (S.ds.kind === 'table') drawPredictionMatrix(ctx, w, h);
+  else drawRegions(ctx, w, h);
+}
+
+function drawRegions(ctx, w, h) {
+  const ds = S.ds, net = S.net;
+  const m = { l: 34, r: 10, t: 8, b: 22 };
+  const pw = w - m.l - m.r, ph = h - m.t - m.b;
+  if (pw <= 0 || ph <= 0) return;
+  const [d0, d1] = ds.domain;
+  const side = Math.min(pw, ph);
+  const ox = m.l + (pw - side) / 2, oy = m.t + (ph - side) / 2;
+  const toX = (v) => ox + ((v - d0) / (d1 - d0)) * side;
+  const toY = (v) => oy + side - ((v - d0) / (d1 - d0)) * side;
+  const multi = ds.metric === 'argmax';
+
+  const RES = 64;
+  heatCanvas.width = RES; heatCanvas.height = RES;
+  const hctx = heatCanvas.getContext('2d');
+  const img = hctx.createImageData(RES, RES);
+  for (let py = 0; py < RES; py++) {
+    for (let px = 0; px < RES; px++) {
+      const x = d0 + ((px + 0.5) / RES) * (d1 - d0);
+      const y = d1 - ((py + 0.5) / RES) * (d1 - d0);
+      const out = net.predict([x, y]);
+      const k = (py * RES + px) * 4;
+      let r, g, b, a;
+      if (multi) {
+        const s = out.reduce((t, v) => t + v, 0) || 1;
+        r = g = b = 0;
+        out.forEach((v, c) => { const wgt = v / s; r += CLASS_COLORS[c][0] * wgt; g += CLASS_COLORS[c][1] * wgt; b += CLASS_COLORS[c][2] * wgt; });
+        const conf = Math.max(...out) / s;
+        r *= 0.6; g *= 0.6; b *= 0.6; a = 90 + 140 * conf;
+      } else {
+        const p = clamp(out[0], 0, 1);
+        const edge = 1 - Math.min(1, Math.abs(p - 0.5) * 6);
+        r = lerp(COLORS.purple[0], COLORS.emerald[0], p) * 0.55 + 255 * edge * 0.25;
+        g = lerp(COLORS.purple[1], COLORS.emerald[1], p) * 0.55 + 255 * edge * 0.25;
+        b = lerp(COLORS.purple[2], COLORS.emerald[2], p) * 0.55 + 255 * edge * 0.25;
+        a = 120 + 180 * Math.abs(p - 0.5);
+      }
+      img.data[k] = r; img.data[k + 1] = g; img.data[k + 2] = b; img.data[k + 3] = a;
+    }
+  }
+  hctx.putImageData(img, 0, 0);
+  ctx.save(); ctx.imageSmoothingEnabled = true; ctx.globalAlpha = 0.9;
+  ctx.drawImage(heatCanvas, ox, oy, side, side);
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(148,163,184,0.25)'; ctx.lineWidth = 1; ctx.strokeRect(ox, oy, side, side);
+
+  ctx.font = '9.5px "JetBrains Mono", monospace'; ctx.fillStyle = 'rgba(148,163,184,0.65)';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  [-1, 0, 1].forEach((t) => ctx.fillText(String(t), toX(t), oy + side + 5));
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  [-1, 0, 1].forEach((t) => ctx.fillText(String(t), ox - 5, toY(t)));
+
+  for (const d of S.data) {
+    const x = toX(d.x[0]), y = toY(d.x[1]);
+    const out = net.predict(d.x);
+    let col, ok;
+    if (multi) { const c = argmax(d.y); col = CLASS_COLORS[c]; ok = argmax(out) === c; }
+    else { col = d.y[0] ? COLORS.emerald : COLORS.purple; ok = (out[0] >= 0.5 ? 1 : 0) === d.y[0]; }
+    ctx.fillStyle = rgba(col, 1);
+    ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = ok ? 'rgba(255,255,255,0.75)' : 'rgba(251,113,133,1)';
+    ctx.lineWidth = ok ? 0.8 : 1.8; ctx.stroke();
+  }
+  drawProbe(ctx, toX(S.probe[0]), toY(S.probe[1]));
+}
+
+function drawPredictionMatrix(ctx, w, h) {
+  const ds = S.ds, net = S.net;
+  const nIn = ds.inLabels.length, nOut = ds.outLabels.length, rows = S.data.length;
+  const m = { l: 28, r: 30, t: 22, b: 4 };
+  const pw = w - m.l - m.r, ph = h - m.t - m.b;
+  const gap = 18;
+  const cols = nIn + nOut * 2;
+  const cs = clamp(Math.min((ph / rows) - 4, (pw - gap * 2) / cols - 3), 6, 22);
+  const step = cs + 3;
+  const rowH = Math.min(ph / rows, cs + 6);
+  const totalW = cols * step + gap * 2;
+  const ox = m.l + Math.max(0, (pw - totalW) / 2);
+  const oy = m.t + Math.max(0, (ph - rows * rowH) / 2);
+  const xIn = (i) => ox + i * step;
+  const xT = (k) => ox + nIn * step + gap + k * step;
+  const xP = (k) => ox + nIn * step + gap + nOut * step + gap + k * step;
+
+  // column headers
+  ctx.font = '600 9px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ds.inLabels.forEach((lab, i) => { ctx.fillStyle = '#67e8f9'; ctx.fillText(lab, xIn(i) + cs / 2, oy - 5); });
+  ds.outLabels.forEach((lab, k) => {
+    ctx.fillStyle = '#cbd5e1'; ctx.fillText(lab, xT(k) + cs / 2, oy - 5);
+    ctx.fillStyle = '#6ee7b7'; ctx.fillText(lab, xP(k) + cs / 2, oy - 5);
+  });
+  ctx.fillStyle = 'rgba(148,163,184,0.55)'; ctx.font = '600 8.5px Inter, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('INPUT', xIn(0), oy - 14);
+  ctx.fillText('TARGET', xT(0), oy - 14);
+  ctx.fillText('PREDICTION ŷ', xP(0), oy - 14);
+
+  const probeIdx = S.data.findIndex((s) => s.x.every((v, i) => Math.abs(v - S.probe[i]) < 1e-9));
+  S.data.forEach((d, r) => {
+    const y = oy + r * rowH + (rowH - cs) / 2;
+    const out = net.predict(d.x);
+    if (r === probeIdx) {
+      ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(ox - 24, y - 2, totalW + 48, cs + 4);
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.strokeRect(ox - 24, y - 2, totalW + 48, cs + 4);
+    }
+    // row label
+    ctx.font = '600 10px "JetBrains Mono", monospace'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(203,213,225,0.85)';
+    ctx.fillText(d.label || String(r), ox - 6, y + cs / 2);
+    // inputs
+    d.x.forEach((v, i) => {
+      ctx.fillStyle = v ? 'rgba(34,211,238,0.85)' : 'rgba(34,211,238,0.07)';
+      ctx.fillRect(xIn(i), y, cs, cs);
+      ctx.strokeStyle = 'rgba(34,211,238,0.35)'; ctx.lineWidth = 1; ctx.strokeRect(xIn(i) + 0.5, y + 0.5, cs - 1, cs - 1);
+    });
+    // arrow
+    ctx.fillStyle = 'rgba(148,163,184,0.45)'; ctx.textAlign = 'center';
+    ctx.fillText('→', ox + nIn * step + gap / 2 - 1, y + cs / 2);
+    let all = true;
+    d.y.forEach((t, k) => {
+      ctx.fillStyle = t ? 'rgba(226,232,240,0.85)' : 'rgba(226,232,240,0.05)';
+      ctx.fillRect(xT(k), y, cs, cs);
+      ctx.strokeStyle = 'rgba(226,232,240,0.35)'; ctx.strokeRect(xT(k) + 0.5, y + 0.5, cs - 1, cs - 1);
+      const p = clamp(out[k], 0, 1);
+      const ok = (p >= 0.5 ? 1 : 0) === t;
+      if (!ok) all = false;
+      ctx.save();
+      ctx.shadowColor = 'rgba(52,211,153,0.9)'; ctx.shadowBlur = 8 * p;
+      ctx.fillStyle = `rgba(52,211,153,${0.06 + 0.9 * p})`;
+      ctx.fillRect(xP(k), y, cs, cs);
+      ctx.restore();
+      ctx.strokeStyle = ok ? 'rgba(52,211,153,0.45)' : 'rgba(251,113,133,0.95)';
+      ctx.lineWidth = ok ? 1 : 1.6;
+      ctx.strokeRect(xP(k) + 0.5, y + 0.5, cs - 1, cs - 1);
+    });
+    ctx.fillStyle = 'rgba(148,163,184,0.45)'; ctx.font = '600 10px "JetBrains Mono", monospace';
+    ctx.fillText('→', xT(nOut) + gap / 2 - 3, y + cs / 2);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = all ? '#34d399' : '#fb7185';
+    ctx.fillText(all ? '✓' : '✗', xP(nOut) + 4, y + cs / 2);
+  });
+}
+
+function drawProbe(ctx, x, y) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.2;
+  ctx.shadowColor = '#fff'; ctx.shadowBlur = 8;
+  ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x - 12, y); ctx.lineTo(x - 4, y); ctx.moveTo(x + 4, y); ctx.lineTo(x + 12, y);
+  ctx.moveTo(x, y - 12); ctx.lineTo(x, y - 4); ctx.moveTo(x, y + 4); ctx.lineTo(x, y + 12); ctx.stroke();
+  ctx.restore();
+}
+
+/* =====================================================================
+   MAIN LOOP
+   ===================================================================== */
+let lastFrame = performance.now(), lastOutDraw = 0, lastUi = 0;
+function frame(now) {
+  const dt = Math.min(now - lastFrame, 100);
+  lastFrame = now;
+
+  if (S.running) {
+    for (let k = 0; k < S.speed; k++) {
+      if (S.epoch >= S.maxEpochs) break;
+      const ok = doEpoch();
+      S.epsCounter.e++;
+      if (!ok) break;
+      if (k < S.speed - 1) S.history.push(S.net.evaluate(S.data, S.ds.metric).loss);
+    }
+    afterTraining();
+    if (S.running && now - S.lastLog > 700) {
+      S.lastLog = now;
+      log(`Epoch ${S.epoch} · MSE ${fmtLoss(S.metrics.loss)} · ${scoreText()} · ŷ(probe)=[${S.net.a[S.net.L - 1].map((v) => fmt(v, 2)).join(', ')}]`, 'info');
+    }
+    if (S.running && S.epoch >= S.maxEpochs) onTargetReached();
+  }
+
+  if (now - S.epsCounter.t > 1000) {
+    S.epsCounter.value = Math.round((S.epsCounter.e * 1000) / (now - S.epsCounter.t));
+    S.epsCounter.t = now; S.epsCounter.e = 0;
+  }
+
+  const A = S.anim;
+  if (A.phase) {
+    const segMs = S.running ? 240 : 420;
+    A.t += dt / segMs;
+    if (A.t >= S.net.L - 1) {
+      if (A.queue.length) { A.phase = A.queue.shift(); A.t = 0; }
+      else if (S.running) { A.phase = A.phase === 'fwd' ? 'bwd' : 'fwd'; A.t = 0; }
+      else { A.phase = null; A.t = 0; }
+    }
+  }
+  const chip = $('phaseChip');
+  const phaseKey = A.phase || 'idle';
+  if (chip.dataset.phase !== phaseKey) {
+    chip.dataset.phase = phaseKey;
+    if (A.phase === 'fwd') { chip.textContent = '▶ Forward pass'; chip.className = 'chip bg-cyan-400/10 text-cyan-300 border border-cyan-400/40'; }
+    else if (A.phase === 'bwd') { chip.textContent = '◀ Backpropagation'; chip.className = 'chip bg-rose-400/10 text-rose-300 border border-rose-400/40'; }
+    else { chip.textContent = 'Idle'; chip.className = 'chip bg-slate-800/70 text-slate-400 border border-slate-600/30'; }
+  }
+
+  drawNetwork(now);
+  if (S.dirty.loss) { drawLoss(); S.dirty.loss = false; }
+  if (S.dirty.out && now - lastOutDraw > (S.running ? 150 : 0)) { drawOutput(); S.dirty.out = false; lastOutDraw = now; }
+  if (S.running && now - lastUi > 100) { lastUi = now; updateMetrics(); renderInspector(); updatePredictionReadout(); }
+
+  requestAnimationFrame(frame);
+}
+
+/* =====================================================================
+   EVENTS
+   ===================================================================== */
+function bindEvents() {
+  $('datasetSelect').addEventListener('change', (e) => { setRunning(false); loadDataset(e.target.value); });
+
+  const rebuild = () => { setRunning(false); buildNetwork(); };
+  $('layersRange').addEventListener('input', (e) => {
+    const n = +e.target.value;
+    while (S.hidden.length < n) S.hidden.push(S.hidden[S.hidden.length - 1]);
+    S.hidden.length = n;
+    $('layersVal').textContent = n; setFill(e.target);
+    renderLayerSliders(); rebuild();
+  });
+  $('actSelect').addEventListener('change', (e) => { S.act = e.target.value; rebuild(); });
+
+  $('lrRange').addEventListener('input', (e) => { S.lr = sliderToLr(+e.target.value); $('lrNumber').value = S.lr; setFill(e.target); renderEquations(); });
+  $('lrRange').addEventListener('change', () => log(`Learning rate η → ${S.lr}`, 'sys'));
+  $('lrNumber').addEventListener('change', (e) => {
+    const v = clamp(parseFloat(e.target.value) || 0.01, LR_MIN, LR_MAX);
+    S.lr = v; e.target.value = v; $('lrRange').value = lrToSlider(v); setFill($('lrRange')); renderEquations();
+    log(`Learning rate η → ${S.lr}`, 'sys');
+  });
+  $('momRange').addEventListener('input', (e) => { S.momentum = +e.target.value; $('momVal').textContent = S.momentum.toFixed(2); setFill(e.target); renderEquations(); });
+  $('momRange').addEventListener('change', () => log(`Momentum β → ${S.momentum}`, 'sys'));
+  $('epochsRange').addEventListener('input', (e) => { S.maxEpochs = +e.target.value; $('epochsVal').textContent = S.maxEpochs.toLocaleString(); setFill(e.target); updateMetrics(); });
+  $('speedRange').addEventListener('input', (e) => { S.speed = +e.target.value; $('speedVal').textContent = `${S.speed} epoch${S.speed > 1 ? 's' : ''}/frame`; setFill(e.target); });
+
+  $('stepBtn').addEventListener('click', trainStep);
+  $('runBtn').addEventListener('click', () => setRunning(!S.running));
+  $('resetBtn').addEventListener('click', () => { setRunning(false); setStatus('idle'); buildNetwork(true); });
+  $('predictBtn').addEventListener('click', runPrediction);
+  $('sampleSelect').addEventListener('change', (e) => {
+    if (e.target.value === '') return;
+    setProbeInputs(S.data[+e.target.value].x);
+    runPrediction();
+  });
+  $('clearLogBtn').addEventListener('click', () => { $('log').innerHTML = ''; });
+
+  $('optValues').addEventListener('change', (e) => { S.opts.values = e.target.checked; });
+  $('optPulses').addEventListener('change', (e) => { S.opts.pulses = e.target.checked; });
+  $('optFlow').addEventListener('change', (e) => { S.opts.flow = e.target.checked; });
+
+  window.addEventListener('keydown', (e) => {
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (['input', 'select', 'textarea', 'button'].includes(tag) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.code === 'Space') { e.preventDefault(); setRunning(!S.running); }
+    else if (e.key === 's' || e.key === 'S') trainStep();
+    else if (e.key === 'r' || e.key === 'R') { setRunning(false); setStatus('idle'); buildNetwork(true); }
+  });
+
+  const cvs = $('nnCanvas'), tip = $('nnTooltip'), wrap = $('nnWrap');
+  const hit = (ev) => {
+    const rect = cvs.getBoundingClientRect();
+    const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+    for (let l = 0; l < S.nodePos.length; l++) for (let j = 0; j < S.nodePos[l].length; j++) {
+      const p = S.nodePos[l][j];
+      if (Math.hypot(mx - p.x, my - p.y) <= p.r + 5) return { l, j, p };
+    }
+    return null;
+  };
+  cvs.addEventListener('mousemove', (ev) => {
+    const h = hit(ev);
+    S.hover = h ? { l: h.l, j: h.j } : null;
+    cvs.style.cursor = h ? 'pointer' : 'default';
+    if (!h) { tip.style.opacity = 0; return; }
+    const net = S.net, { l, j } = h, L = net.L;
+    let html = `<div class="text-cyan-300 font-semibold mb-1">${layerName(l, L)} · ${neuronLabel(l, j)}</div>`;
+    if (l === 0) html += `<div>value = ${fmt(net.a[0][j], 4)}</div>`;
+    else {
+      html += `<div>z = ${fmt(net.z[l][j], 4)}</div><div>a = ${net.actOf(l).short}(z) = <span class="text-emerald-300">${fmt(net.a[l][j], 4)}</span></div>`;
+      html += `<div>bias = <span class="text-amber-300">${fmt(net.b[l - 1][j], 4)}</span></div>`;
+      html += `<div class="text-rose-300">|δ| = ${net.nodeGrad[l][j].toExponential(2)}</div>`;
+      const ws = net.W[l - 1][j];
+      html += `<div class="mt-1 text-slate-500">w<sub>in</sub> (${ws.length}): ${ws.slice(0, 8).map((v) => `<span class="${v >= 0 ? 'text-cyan-300' : 'text-purple-300'}">${fmt(v, 2)}</span>`).join(' ')}${ws.length > 8 ? ' …' : ''}</div>`;
+    }
+    tip.innerHTML = html;
+    const wr = wrap.getBoundingClientRect();
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    let x = h.p.x + h.p.r + 12, y = h.p.y - th / 2;
+    if (x + tw > wr.width - 8) x = h.p.x - h.p.r - 12 - tw;
+    y = clamp(y, 6, wr.height - th - 6);
+    tip.style.left = `${x}px`; tip.style.top = `${y}px`; tip.style.opacity = 1;
+  });
+  cvs.addEventListener('mouseleave', () => { S.hover = null; tip.style.opacity = 0; });
+  cvs.addEventListener('click', (ev) => {
+    const h = hit(ev);
+    if (h) { S.selected = { l: h.l, j: h.j }; renderInspector(); }
+  });
+
+  const ro = new ResizeObserver(() => { S.dirty.loss = S.dirty.out = true; });
+  [$('lossCanvas'), $('outCanvas'), $('nnCanvas')].forEach((c) => ro.observe(c));
+}
+
+/* ---------------- Boot ---------------- */
+function init() {
+  bindEvents();
+  log('Deep Network Lab ready — information flows Input → Hidden 1 → Hidden 2 → … → Output. Press <b>Train Step</b> or <b>Auto-Run</b>.', 'ok');
+  loadDataset('seg7');
+  setStatus('idle');
+  requestAnimationFrame(frame);
+}
+init();
+</script>
+</body>
+</html>
