@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuroLab · Transformer &amp; Tokens</title>
+  <meta name="description" content="See how AI language models read a sentence: tokenization, token IDs, embeddings, positional encoding, self-attention, feed-forward layers and next-word prediction, animated step by step." />
+  <meta name="theme-color" content="#020617" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23020617'/%3E%3Crect x='4' y='12' width='7' height='8' rx='2' fill='%2322d3ee'/%3E%3Crect x='13' y='12' width='6' height='8' rx='2' fill='%23a855f7'/%3E%3Crect x='21' y='12' width='7' height='8' rx='2' fill='%23fbbf24'/%3E%3Cpath d='M7 11 Q16 2 25 11' stroke='%23fbbf24' stroke-width='1.6' fill='none'/%3E%3C/svg%3E" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <script>
+    if (window.tailwind) tailwind.config = {
+      theme: { extend: { fontFamily: {
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+      } } },
+    };
+  </script>
+  <link rel="stylesheet" href="nn-theme.css" />
+  <style>
+    /* ---------- Token chips (each token keeps its own colour through every stage) ---------- */
+    .tk {
+      --h: 190;
+      display: inline-flex; align-items: center; gap: .2rem;
+      padding: .3rem .55rem; border-radius: .6rem;
+      font: 600 .82rem/1.1 'JetBrains Mono', monospace;
+      color: hsl(var(--h) 95% 82%);
+      background: hsl(var(--h) 90% 55% / .12);
+      border: 1px solid hsl(var(--h) 90% 60% / .45);
+      box-shadow: 0 0 14px -6px hsl(var(--h) 90% 60% / .9);
+      white-space: nowrap;
+    }
+    .tk .hash { opacity: .45; }
+    .tk.special { --h: 42; border-style: dashed; }
+    .tk.unk { --h: 350; border-style: dashed; }
+    .tk.sm { font-size: .7rem; padding: .18rem .4rem; border-radius: .45rem; }
+    button.tk { cursor: pointer; transition: transform .12s, box-shadow .12s; }
+    button.tk:hover { transform: translateY(-1px); }
+    button.tk.on { outline: 2px solid hsl(var(--h) 95% 75%); outline-offset: 2px; box-shadow: 0 0 18px -2px hsl(var(--h) 90% 60%); }
+
+    /* ---------- Reveal animations (driven by adding .in to the stage body) ---------- */
+    .rv { opacity: 0; transform: translateY(10px) scale(.92); transition: opacity .45s ease, transform .5s cubic-bezier(.2,.8,.2,1.15); transition-delay: var(--d, 0ms); }
+    .in .rv { opacity: 1; transform: none; }
+    .rv-x { opacity: 0; transform: translateX(-14px); transition: opacity .4s ease, transform .4s ease; transition-delay: var(--d, 0ms); }
+    .in .rv-x { opacity: 1; transform: none; }
+    .rv-pop { opacity: 0; transform: scale(.3); transition: opacity .3s ease, transform .4s cubic-bezier(.2,.9,.3,1.4); transition-delay: var(--d, 0ms); }
+    .in .rv-pop { opacity: 1; transform: none; }
+
+    /* flip card: token → ID */
+    .flip { perspective: 700px; display: inline-block; }
+    .flip-in { position: relative; display: block; transition: transform .7s cubic-bezier(.3,.7,.2,1); transition-delay: var(--d, 0ms); transform-style: preserve-3d; }
+    .in .flip-in { transform: rotateY(180deg); }
+    .flip-f, .flip-b { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+    .flip-f { display: flex; justify-content: center; min-width: 2.9rem; }
+    .flip-b { position: absolute; inset: 0; transform: rotateY(180deg); display: grid; place-items: center; }
+
+    /* bars */
+    .bar-fill { width: 0; transition: width .9s cubic-bezier(.2,.8,.2,1); transition-delay: var(--d, 0ms); }
+    .in .bar-fill { width: var(--w); }
+
+    /* characters */
+    .charbox { display: grid; place-items: center; min-width: 1.9rem; padding: .25rem .2rem; border-radius: .45rem; background: rgba(2,6,23,.7); border: 1px solid rgba(148,163,184,.18); }
+    .charbox .c { font: 600 .9rem 'JetBrains Mono', monospace; color: #e2e8f0; }
+    .charbox .n { font: 500 .6rem 'JetBrains Mono', monospace; color: #67e8f9; opacity: .85; }
+    .charbox.changed { border-color: rgba(251,191,36,.6); background: rgba(251,191,36,.08); }
+    .charbox.changed .c { color: #fde68a; }
+
+    /* vectors */
+    .vstrip { display: inline-grid; grid-template-columns: repeat(8, minmax(1.7rem, 1fr)); gap: 2px; }
+    .vc { height: 1.45rem; border-radius: 3px; display: grid; place-items: center; font: 500 .58rem 'JetBrains Mono', monospace; color: rgba(255,255,255,.85); }
+
+    /* heatmap */
+    .hm { display: grid; gap: 2px; font: 500 .62rem 'JetBrains Mono', monospace; }
+    .hm .hc { min-height: 1.35rem; border-radius: 3px; display: grid; place-items: center; color: rgba(255,255,255,.9); }
+    .hm .hl { color: #94a3b8; display: flex; align-items: center; justify-content: flex-end; padding-right: .3rem; white-space: nowrap; overflow: hidden; }
+    .hm .hh { color: #94a3b8; text-align: center; writing-mode: vertical-rl; transform: rotate(180deg); padding-bottom: .2rem; max-height: 4.5rem; overflow: hidden; white-space: nowrap; }
+    .hm .masked { background: repeating-linear-gradient(45deg, rgba(148,163,184,.08) 0 3px, transparent 3px 6px); color: rgba(148,163,184,.35); }
+    .hm .rowsel { outline: 1px solid rgba(251,191,36,.7); }
+
+    /* stages */
+    .stage { scroll-margin-top: 90px; opacity: .5; transition: opacity .4s, border-color .4s, box-shadow .4s; }
+    @media (min-width: 1024px) { .stage { scroll-margin-top: 200px; } }
+    .stage.reached { opacity: 1; }
+    .stage.active { border-color: rgba(251,191,36,.55); box-shadow: 0 0 0 1px rgba(251,191,36,.2), 0 0 40px -12px rgba(251,191,36,.6); }
+    .stage-num { width: 1.75rem; height: 1.75rem; border-radius: .6rem; display: grid; place-items: center; font: 700 .8rem 'JetBrains Mono', monospace; background: rgba(148,163,184,.08); border: 1px solid rgba(148,163,184,.25); color: #94a3b8; flex-shrink: 0; }
+    .stage.reached .stage-num { background: rgba(251,191,36,.12); border-color: rgba(251,191,36,.5); color: #fde68a; }
+    .stage.active .stage-num { box-shadow: 0 0 16px rgba(251,191,36,.7); }
+    .waiting { color: #64748b; font-size: .75rem; padding: .75rem; border: 1px dashed rgba(148,163,184,.2); border-radius: .75rem; text-align: center; }
+
+    /* stepper */
+    .step-chip { display: flex; flex-direction: column; align-items: center; gap: .25rem; min-width: 4.25rem; cursor: pointer; background: none; border: 0; color: inherit; }
+    .step-dot { width: 1.9rem; height: 1.9rem; border-radius: 999px; display: grid; place-items: center; font: 700 .7rem 'JetBrains Mono', monospace; border: 1px solid rgba(148,163,184,.3); color: #94a3b8; background: rgba(2,6,23,.8); transition: all .3s; }
+    .step-lbl { font-size: .62rem; color: #64748b; white-space: nowrap; transition: color .3s; }
+    .step-chip.done .step-dot { border-color: rgba(52,211,153,.6); color: #6ee7b7; background: rgba(52,211,153,.1); }
+    .step-chip.done .step-lbl { color: #a7f3d0; }
+    .step-chip.active .step-dot { border-color: #fbbf24; color: #fde68a; background: rgba(251,191,36,.18); box-shadow: 0 0 18px rgba(251,191,36,.8); transform: scale(1.12); }
+    .step-chip.active .step-lbl { color: #fde68a; }
+    .step-line { flex: 1; min-width: .75rem; height: 2px; margin-top: .95rem; background: rgba(148,163,184,.18); position: relative; overflow: hidden; border-radius: 2px; }
+    .step-line::after { content: ''; position: absolute; inset: 0; width: var(--p, 0%); background: linear-gradient(90deg, #34d399, #fbbf24); transition: width .5s; }
+
+    .tab { padding: .3rem .7rem; border-radius: .6rem; font-size: .72rem; font-weight: 600; border: 1px solid rgba(148,163,184,.2); color: #94a3b8; background: rgba(2,6,23,.6); transition: all .15s; }
+    .tab.on { color: #020617; }
+    .tab[data-head="0"].on { background: #22d3ee; border-color: #22d3ee; }
+    .tab[data-head="1"].on { background: #c084fc; border-color: #c084fc; }
+    .tab[data-head="2"].on { background: #fbbf24; border-color: #fbbf24; }
+
+    textarea.field { resize: vertical; min-height: 4.5rem; font-family: 'JetBrains Mono', monospace; }
+    @media (prefers-reduced-motion: reduce) {
+      .rv, .rv-x, .rv-pop, .flip-in, .bar-fill, .stage { transition: none !important; }
+    }
+  </style>
+</head>
+
+<body class="min-h-full text-slate-200 font-sans antialiased">
+  <header class="sticky top-0 z-30 border-b border-white/5 bg-slate-950/80 backdrop-blur-md">
+    <div class="max-w-[1800px] mx-auto flex items-center justify-between gap-3 px-4 lg:px-6 py-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <a href="index.html" class="relative w-9 h-9 rounded-xl grid place-items-center bg-slate-900 border border-amber-400/30 shadow-[0_0_20px_-4px_rgba(251,191,36,0.6)] shrink-0" title="Back to the basics page">
+          <svg viewBox="0 0 32 32" class="w-6 h-6" aria-hidden="true">
+            <rect x="3" y="13" width="7" height="8" rx="2" fill="#22d3ee"/><rect x="12.5" y="13" width="7" height="8" rx="2" fill="#a855f7"/><rect x="22" y="13" width="7" height="8" rx="2" fill="#fbbf24"/>
+            <path d="M6.5 12 Q16 1 25.5 12" stroke="#fbbf24" stroke-width="1.6" fill="none"/><path d="M16 12 Q21 6 25.5 12" stroke="#c084fc" stroke-width="1.2" fill="none"/>
+          </svg>
+        </a>
+        <div class="min-w-0">
+          <h1 class="text-base sm:text-lg font-bold tracking-tight leading-tight truncate">
+            <span class="neon-text-cyan">Neuro</span><span class="neon-text-purple">Lab</span>
+            <span class="text-slate-400 font-medium hidden sm:inline">· Transformer &amp; Tokens</span>
+          </h1>
+          <p class="text-[11px] text-slate-500 truncate">How AI language models read a sentence and guess the next word</p>
+        </div>
+      </div>
+      <nav class="flex items-center gap-2 shrink-0" aria-label="Pages">
+        <a href="index.html" class="btn btn-ghost btn-nav" title="Neural network basics">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>
+          <span class="hidden md:inline">Basic Example</span><span class="md:hidden">Basic</span>
+        </a>
+        <a href="complex.html" class="btn btn-purple btn-nav" title="Deep network example">
+          <span class="hidden md:inline">Complex Example</span><span class="md:hidden">Deep</span>
+        </a>
+        <span id="statusChip" class="chip hidden sm:inline-flex bg-slate-800/80 text-slate-300 border border-slate-600/40">
+          <span id="statusDot" class="dot bg-slate-400"></span><span id="statusText">Idle</span>
+        </span>
+      </nav>
+    </div>
+  </header>
+
+  <div class="max-w-[1800px] mx-auto flex flex-col lg:flex-row gap-4 p-4 lg:p-6">
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="w-full lg:w-[320px] xl:w-[340px] shrink-0 space-y-4 lg:sticky lg:top-[76px] lg:self-start lg:max-h-[calc(100vh-92px)] lg:overflow-y-auto thin-scroll" aria-label="Controls">
+      <section class="panel p-4 space-y-3">
+        <h2 class="panel-title">01 · Type a sentence <button class="info-i" data-info="nlp"></button></h2>
+        <label for="sentence" class="sr-only">Sentence</label>
+        <textarea id="sentence" class="field" maxlength="140" spellcheck="false">The cat sat on the mat.</textarea>
+        <div class="flex flex-wrap gap-1.5" id="examples"></div>
+        <button id="transformBtn" class="btn btn-amber w-full !py-3 !text-base">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>
+          Transform
+        </button>
+        <p class="text-[11px] text-slate-500">Press <span class="kbd">Ctrl</span>+<span class="kbd">Enter</span> in the box to transform. Short, simple English sentences work best.</p>
+      </section>
+
+      <section class="panel p-4 space-y-3">
+        <h2 class="panel-title">02 · Playback</h2>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="pauseBtn" class="btn btn-emerald" disabled>
+            <svg id="pauseIcon" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+            <span id="pauseLabel">Pause</span>
+          </button>
+          <button id="nextBtn" class="btn btn-cyan" title="Play just the next stage">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4l10 8-10 8V4z"/><path d="M19 5v14"/></svg>
+            Next step
+          </button>
+        </div>
+        <button id="instantBtn" class="btn btn-ghost w-full">Show everything instantly</button>
+        <div>
+          <div class="flex justify-between text-xs mb-1"><label for="speedRange" class="text-slate-400">Animation speed</label><span id="speedVal" class="font-mono text-slate-200"></span></div>
+          <input id="speedRange" type="range" min="0.5" max="3" step="0.25" value="1" />
+        </div>
+        <label class="flex items-center justify-between text-xs text-slate-300 cursor-pointer">
+          <span>Scroll to follow the animation</span>
+          <span class="relative"><input id="optFollow" type="checkbox" class="sr-only" checked /><span class="toggle block"></span></span>
+        </label>
+      </section>
+
+      <section class="panel p-4 space-y-3">
+        <h2 class="panel-title">03 · Model settings <button class="info-i" data-info="toyModel"></button></h2>
+        <label for="optCausal" class="flex items-center justify-between text-xs text-slate-300 cursor-pointer gap-2">
+          <span class="flex items-center gap-1.5">Causal mask (GPT-style) <button class="info-i" data-info="causalMask"></button></span>
+          <span class="relative"><input id="optCausal" type="checkbox" class="sr-only" checked /><span class="toggle block"></span></span>
+        </label>
+        <div>
+          <div class="flex justify-between items-center text-xs mb-1"><label for="tempRange" class="text-slate-400 flex items-center gap-1.5">Temperature <button class="info-i" data-info="temperature"></button></label><span id="tempVal" class="font-mono text-slate-200"></span></div>
+          <input id="tempRange" type="range" min="0.2" max="2" step="0.1" value="0.8" />
+          <div class="flex justify-between text-[10px] font-mono text-slate-600"><span>0.2 safe</span><span>2.0 creative</span></div>
+        </div>
+      </section>
+
+      <section class="panel p-4">
+        <h2 class="panel-title mb-3">04 · Your sentence in numbers</h2>
+        <dl class="grid grid-cols-2 gap-2 text-xs" id="stats"></dl>
+      </section>
+
+      <section class="panel p-4">
+        <h2 class="panel-title mb-3">05 · Key words to know</h2>
+        <div class="flex flex-wrap gap-1.5 text-[11px]" id="glossaryChips"></div>
+      </section>
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <main class="flex-1 min-w-0 space-y-4">
+      <details class="intro panel p-4" open>
+        <summary class="flex items-center justify-between gap-3">
+          <span class="flex items-center gap-2 text-sm font-semibold text-slate-200">
+            <svg class="intro-caret w-4 h-4 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
+            How does an AI like ChatGPT or Claude read your sentence?
+            <button class="info-i" data-info="transformer"></button>
+          </span>
+          <span class="text-[11px] text-slate-500 hidden sm:inline">Click to hide</span>
+        </summary>
+        <div class="mt-3 grid md:grid-cols-3 gap-3 text-xs text-slate-400 leading-relaxed">
+          <div class="how-step"><span class="how-num bg-cyan-400/15 text-cyan-300 border border-cyan-400/40">1</span><p><b class="text-cyan-300">Tokenize.</b> Chop the text into small pieces called tokens and swap each one for an ID number (steps 1–5). <button class="info-i" data-info="tokenization"></button></p></div>
+          <div class="how-step"><span class="how-num bg-purple-400/15 text-purple-300 border border-purple-400/40">2</span><p><b class="text-purple-300">Understand.</b> A transformer turns IDs into "meaning vectors", lets the tokens look at each other (attention) and processes them with a neural network (steps 6–9). <button class="info-i" data-info="attention"></button></p></div>
+          <div class="how-step"><span class="how-num bg-amber-400/15 text-amber-300 border border-amber-400/40">3</span><p><b class="text-amber-300">Predict.</b> Score every word it knows for "what comes next?", pick one, add it to the text and repeat. That is how AI writes (step 10). <button class="info-i" data-info="nextToken"></button></p></div>
+        </div>
+        <p class="mt-3 text-[11px] text-slate-500 flex items-start gap-1.5"><span class="text-amber-300">⚑</span> This is a tiny <b>toy model</b> (8 numbers per token, about 670 vocabulary tokens, one transformer block). The steps are the real ones; the numbers are small enough to see. <button class="info-i" data-info="toyModel"></button></p>
+      </details>
+
+      <!-- Pipeline stepper -->
+      <section class="panel p-4 lg:sticky lg:top-[76px] z-20" aria-label="Pipeline progress">
+        <div class="flex items-center justify-between gap-3 mb-2 text-[10px] uppercase tracking-widest font-semibold">
+          <span class="text-cyan-300/80 flex items-center gap-1">Tokenization <button class="info-i" data-info="tokenization"></button></span>
+          <span class="text-purple-300/80 flex items-center gap-1">Transformer block <button class="info-i" data-info="transformerBlock"></button></span>
+          <span class="text-amber-300/80 flex items-center gap-1">Output <button class="info-i" data-info="logits"></button></span>
+        </div>
+        <div id="stepper" class="flex items-start overflow-x-auto thin-scroll pb-1"></div>
+      </section>
+
+      <div id="stages" class="space-y-4"></div>
+
+      <footer class="text-center text-[11px] text-slate-600 py-2">
+        A toy transformer in plain JavaScript · its feed-forward layer uses the same engine as the other pages (<span class="font-mono">nn-core.js</span>) ·
+        <a href="index.html" class="text-cyan-400/80 hover:text-cyan-300">← Basic example</a> ·
+        <a href="complex.html" class="text-purple-300/80 hover:text-purple-200">Complex example</a>
+      </footer>
+    </main>
+  </div>
+
+<script src="nn-core.js"></script>
+<script>
+'use strict';
+/* =====================================================================
+   NeuroLab · Transformer & Tokens
+   A tiny, fully-working transformer pipeline:
+     text → normalize → pre-tokenize → WordPiece subwords → IDs
+          → embeddings + positional encoding → 2-head self-attention
+          → add & norm → feed-forward network (NN.MLP) → add & norm
+          → next-token probabilities
+   Weights are small and partly hand-made so the patterns are readable.
+   ===================================================================== */
+const { clamp, lerp, fmt, escapeHtml: esc, easeOut, softmax, sleep } = NN.util;
+const { mulberry32, gaussian, hashString } = NN.rand;
+const { ui, render } = NN;
+const $ = ui.$;
+const D = 8;            // vector size ("embedding dimensions")
+const CONTEXT = 24;     // max tokens (context window)
+
+/* ---------------------------------------------------------------------
+   1. Vocabulary
+   --------------------------------------------------------------------- */
+// Sub-category → main meaning dimension (d1..d8 in this toy model)
+const DIM_NAMES = ['grammar', 'pronoun', 'living thing', 'action', 'object / place', 'describing', 'time', 'punctuation'];
+const SUB = {
+  func: { main: 0, label: 'grammar words' }, pron: { main: 1, label: 'pronouns' },
+  animal: { main: 2, label: 'animals' }, person: { main: 2, label: 'people' },
+  action: { main: 3, label: 'actions' },
+  place: { main: 4, label: 'places' }, food: { main: 4, label: 'food & drink' }, object: { main: 4, label: 'things' }, tech: { main: 4, label: 'tech & AI' },
+  describe: { main: 5, label: 'describing words' }, time: { main: 6, label: 'time' },
+  punct: { main: 7, label: 'punctuation' }, special: { main: 0, label: 'special' },
+  piece: { main: -1, label: 'word pieces' }, letter: { main: -1, label: 'single letters' },
+};
+const LEX = {
+  func: 'the a an is are was were be been am to of and or but in on at for with from by as into under over about than that this these those there here not no do does did have has had will would can could should if so because then when while very too also just all some any each every more most up down out off',
+  pron: 'i you he she it we they me him her us them my your his its our their what who which',
+  animal: 'cat dog bird fish horse cow lion tiger mouse rabbit animal duck bear',
+  person: 'man woman boy girl child baby teacher student friend mother father brother sister people person king queen doctor farmer',
+  action: 'run walk eat sleep play jump read write sing dance love like see look go make learn think know want need help work talk say sat ran ate saw went came come get give take find tell ask feel try call use build drive fly swim chase climb cook draw open close believe',
+  place: 'house home school park cafe city garden street world room sky sea river mountain forest beach',
+  food: 'apple bread pizza cake milk water rice tea coffee cheese',
+  object: 'mat table chair car tree book ball music game phone door window bed floor box sun moon rain story idea word sentence',
+  tech: 'ai computer data language model token transformer neural network machine algorithm attention vector robot',
+  describe: 'big small happy sad red blue green good bad quick lazy brown beautiful new old fast slow hot cold nice great little long short bright dark smart funny kind young tall soft hard',
+  time: 'today yesterday tomorrow morning night day week year now later always never sometimes soon',
+};
+const PUNCT = ['.', ',', '!', '?', "'", '"', '-', ':', ';', '(', ')'];
+const PREFIXES = ['un', 're', 'pre', 'dis', 'mis', 'non'];
+const STEMS = { happi: 'describe', believ: 'action', beauti: 'describe', transform: 'tech', comput: 'tech', tokeniz: 'tech', learn: 'action', play: 'action' };
+const SUFFIXES = {
+  '##ing': 'action', '##ed': 'action', '##s': 'piece', '##es': 'piece', '##er': 'person', '##ers': 'person', '##ly': 'describe',
+  '##est': 'describe', '##ier': 'describe', '##ness': 'object', '##ment': 'object', '##tion': 'object', '##ity': 'object',
+  '##ful': 'describe', '##less': 'describe', '##able': 'describe', '##ous': 'describe', '##y': 'describe', '##al': 'describe',
+  '##ize': 'action', '##en': 'action', '##ation': 'object', '##ive': 'describe',
+};
+const VOCAB = []; const VINDEX = new Map();
+function addTok(key, kind, sub, candidate = false, rank = 0) {
+  if (VINDEX.has(key)) return;
+  VINDEX.set(key, VOCAB.length);
+  VOCAB.push({ key, kind, sub, main: SUB[sub].main, candidate, rank });
+}
+['[PAD]', '[UNK]', '[START]', '[END]'].forEach((t) => addTok(t, 'special', 'special'));
+PUNCT.forEach((p) => addTok(p, 'punct', 'punct', ['.', ',', '!', '?'].includes(p)));
+Object.entries(LEX).forEach(([sub, words]) => words.split(' ').forEach((w, r) => addTok(w, 'word', sub, true, r)));
+PREFIXES.forEach((p) => addTok(p, 'piece', 'piece'));
+Object.entries(STEMS).forEach(([s, sub]) => addTok(s, 'piece', sub));
+Object.entries(SUFFIXES).forEach(([s, sub]) => addTok(s, 'piece', sub));
+'abcdefghijklmnopqrstuvwxyz0123456789'.split('').forEach((c) => addTok(c, 'letter', 'letter'));
+'abcdefghijklmnopqrstuvwxyz0123456789'.split('').forEach((c) => addTok('##' + c, 'letter', 'letter'));
+// "##" copies of every word/stem of 3+ letters, so they can also appear mid-word
+VOCAB.slice().forEach((v) => { if ((v.kind === 'word' || (v.kind === 'piece' && !v.key.startsWith('##'))) && v.key.length >= 3) addTok('##' + v.key, 'piece', v.sub); });
+
+/* ---------------------------------------------------------------------
+   2. Tokenizer
+   --------------------------------------------------------------------- */
+function normalize(raw) {
+  const out = []; const counts = { space: 0, accent: 0, lower: 0, quote: 0 };
+  const trimmed = raw.replace(/^\s+|\s+$/g, '');
+  counts.space += raw.length - trimmed.length;
+  let prevSpace = false;
+  for (const ch of trimmed) {
+    let c = ch, changed = false;
+    if (/\s/.test(c)) {
+      if (prevSpace) { counts.space++; continue; }
+      if (c !== ' ') { c = ' '; changed = true; counts.space++; }
+      prevSpace = true; out.push({ c, changed }); continue;
+    }
+    prevSpace = false;
+    if ('‘’‚′`'.includes(c)) { c = "'"; changed = true; counts.quote++; }
+    else if ('“”„″'.includes(c)) { c = '"'; changed = true; counts.quote++; }
+    const stripped = c.normalize('NFKD').replace(/\p{M}/gu, '');
+    if (stripped !== c && stripped.length) { c = stripped; changed = true; counts.accent++; }
+    const lower = c.toLowerCase();
+    if (lower !== c) { c = lower; changed = true; counts.lower++; }
+    for (const piece of c) out.push({ c: piece, changed });
+  }
+  return { text: out.map((o) => o.c).join(''), chars: out, counts };
+}
+
+function pretokenize(text) {
+  return Array.from(text.matchAll(/[a-z0-9]+|[^\s]/gu), (m) => ({ text: m[0], kind: /^[a-z0-9]+$/.test(m[0]) ? 'word' : (PUNCT.includes(m[0]) ? 'punct' : 'other') }));
+}
+
+/** Greedy longest-match-first WordPiece (like BERT's tokenizer). */
+function wordpiece(word) {
+  const pieces = []; let start = 0;
+  while (start < word.length) {
+    let end = word.length, found = null;
+    while (end > start) {
+      const sub = word.slice(start, end);
+      const key = start === 0 ? sub : '##' + sub;
+      if (VINDEX.has(key)) { found = key; break; }
+      end--;
+    }
+    if (!found) { pieces.push('[UNK]'); start++; continue; }
+    pieces.push(found); start = end;
+  }
+  return pieces;
+}
+
+/* ---------------------------------------------------------------------
+   3. Embeddings & positions
+   --------------------------------------------------------------------- */
+const SUBVEC = {};
+Object.keys(SUB).forEach((s) => { const r = mulberry32(hashString('sub:' + s)); SUBVEC[s] = Array.from({ length: D }, () => gaussian(r) * 0.3); });
+const EMB_CACHE = new Map();
+function embed(key) {
+  if (EMB_CACHE.has(key)) return EMB_CACHE.get(key);
+  const v = VOCAB[VINDEX.get(key) ?? 1];
+  const r = mulberry32(hashString('tok:' + key));
+  const e = Array.from({ length: D }, () => gaussian(r) * (v.kind === 'letter' ? 0.3 : 0.15));
+  if (v.main >= 0) e[v.main] += v.kind === 'piece' ? 0.6 : 0.95;
+  SUBVEC[v.sub].forEach((s, i) => { e[i] += s; });
+  if (key === '[UNK]') for (let i = 0; i < D; i++) e[i] *= 0.4;
+  EMB_CACHE.set(key, e);
+  return e;
+}
+const PE_BASE = 100; // the original paper uses 10000; 100 suits very short sentences
+const peFreq = (i) => 1 / Math.pow(PE_BASE, (2 * i) / D);
+const posEnc = (p) => Array.from({ length: D }, (_, d) => (d % 2 === 0 ? Math.sin(p * peFreq(d / 2)) : Math.cos(p * peFreq((d - 1) / 2))));
+
+/* ---------------------------------------------------------------------
+   4. Transformer block
+   --------------------------------------------------------------------- */
+// Head 1 "meaning": Query = x·R, Key = x. R says which kinds of words like to look at which.
+const R = Array.from({ length: D }, () => new Array(D).fill(0));
+const rel = (q, k, v) => { R[q][k] = v; };
+for (let i = 0; i < D; i++) rel(i, i, 0.4);
+rel(0, 2, 1.5); rel(0, 4, 1.5); rel(0, 5, 1.0); rel(0, 3, 0.5);
+rel(1, 2, 3.0); rel(1, 4, 1.0); rel(1, 1, 0.5);
+rel(2, 5, 2.0); rel(2, 3, 1.2); rel(2, 0, 0.5);
+rel(3, 2, 2.0); rel(3, 1, 2.0); rel(3, 4, 1.5);
+rel(4, 5, 2.0); rel(4, 3, 1.2); rel(4, 0, 0.5);
+rel(5, 2, 2.0); rel(5, 4, 2.0);
+rel(6, 3, 2.0);
+rel(7, 3, 1.5); rel(7, 2, 1.0); rel(7, 4, 1.0);
+const GAIN1 = 3, GAIN2 = 4;
+const dot = (a, b) => a.reduce((s, v, i) => s + v * b[i], 0);
+const add = (a, b) => a.map((v, i) => v + b[i]);
+const scale = (a, s) => a.map((v) => v * s);
+function layerNorm(v) {
+  const m = v.reduce((a, b) => a + b, 0) / v.length;
+  const sd = Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length) || 1;
+  return v.map((x) => (x - m) / sd);
+}
+// Head 2 "neighbour": rotate each sine/cosine pair back by one position → matches the previous token
+function shiftBack(pe) {
+  const q = pe.slice();
+  for (let i = 0; i < D / 2; i++) {
+    const w = peFreq(i), s = pe[2 * i], c = pe[2 * i + 1];
+    q[2 * i] = s * Math.cos(w) - c * Math.sin(w);       // sin(ω(p−1))
+    q[2 * i + 1] = c * Math.cos(w) + s * Math.sin(w);   // cos(ω(p−1))
+  }
+  return q;
+}
+// Feed-forward network: a real MLP from nn-core.js (8 → 16 → 8, ReLU)
+const FFN = new NN.MLP([D, 16, D], 'relu', 'linear', 20240607);
+
+function attentionHead(Q, K, gain, causal) {
+  const n = Q.length;
+  const S = Q.map((q, i) => K.map((k, j) => (causal && j > i ? -Infinity : (dot(q, k) / Math.sqrt(D)) * gain)));
+  const A = S.map((row) => { const fin = row.filter(Number.isFinite); const m = Math.max(...fin); const e = row.map((v) => (Number.isFinite(v) ? Math.exp(v - m) : 0)); const s = e.reduce((a, b) => a + b, 0); return e.map((v) => v / s); });
+  return { S, A };
+}
+
+/* ---------------------------------------------------------------------
+   5. Next-token prediction (toy "language model head")
+   --------------------------------------------------------------------- */
+// Grammar hints: how likely one kind of word follows another (rows: previous main dim, -1 = letter/piece, 8 = [START])
+const G = {
+  0: { 2: 2.4, 4: 2.4, 5: 2.0, 3: 0.3, 0: -1, 7: -2, end: -3 },
+  1: { 3: 3.0, 0: 0.8, 5: 0.3, 7: -1, end: -3 },
+  2: { 3: 3.0, 7: 1.5, 0: 1.0, end: -1 },
+  3: { 0: 2.5, 1: 1.2, 4: 1.4, 2: 1.0, 5: 0.6, 6: 1.0, 7: 1.0, end: -1 },
+  4: { 7: 2.2, 0: 1.5, 3: 1.2, end: -0.5 },
+  5: { 2: 2.6, 4: 2.6, 7: 0.8, 0: 0.2 },
+  6: { 7: 2.2, 1: 1.2, 0: 1.0 },
+  7: { end: 3.0, 1: 1.2, 0: 1.0, 2: 0.5 },
+  8: { 0: 2.0, 1: 2.0, 2: 1.0, 5: 0.5, end: -4 },
+  '-1': { 7: 1.0, 0: 1.0 },
+};
+const DETS = new Set(['the', 'a', 'an', 'my', 'your', 'his', 'her', 'our', 'their', 'this', 'that']);
+const PREPS = new Set(['on', 'in', 'at', 'under', 'into', 'over', 'to', 'from', 'by']);
+
+function predictNext(M) {
+  const toks = M.tokens, n = toks.length;
+  const last = toks[n - 1], prev = toks[n - 2];
+  const f = M.F[n - 1];
+  // a trailing piece such as "##s" belongs to its word: use the word's stem to decide what comes next
+  let fromMain = last.key === '[START]' ? 8 : last.v.main;
+  if (last.cont || last.v.main < 0) {
+    const stem = toks.find((t) => t.word === last.word && t.v.main >= 0 && !t.cont) || toks.find((t) => t.word === last.word && t.v.main >= 0);
+    if (stem) fromMain = stem.v.main;
+  }
+  const row = G[fromMain] || G[-1];
+  const nouns = toks.filter((t) => t.v.main === 2 || t.v.main === 4).map((t) => embed(t.key));
+  const topic = nouns.length ? nouns.reduce((a, b) => add(a, b)).map((x) => x / nouns.length) : null;
+  const recent = new Set(toks.slice(-3).map((t) => t.key));
+  const cands = VOCAB.filter((v) => v.candidate).concat([VOCAB[VINDEX.get('[END]')]]);
+  const scored = cands.map((v) => {
+    const isEnd = v.key === '[END]';
+    const e = embed(v.key);
+    let s = isEnd ? (row.end ?? -1) : (row[v.main] ?? -0.5);
+    s += 0.6 * dot(f, e) / Math.sqrt(D);           // similarity to the final vector
+    if (topic && !isEnd) s += 0.9 * dot(topic, e);  // stay on topic
+    s -= 0.12 * v.rank;                              // common words first
+    if (recent.has(v.key)) s -= 2;                   // avoid repeating
+    if (DETS.has(last.key) && prev && PREPS.has(prev.key) && (v.sub === 'place' || v.sub === 'object')) s += 1.6;
+    if (last.key === 'to' && v.main === 3) s += 2.5;
+    return { key: v.key, v, logit: s };
+  });
+  const probs = softmax(scored.map((c) => c.logit), S.temperature);
+  scored.forEach((c, i) => { c.p = probs[i]; });
+  scored.sort((a, b) => b.p - a.p);
+  return scored;
+}
+
+/* ---------------------------------------------------------------------
+   6. Full pipeline
+   --------------------------------------------------------------------- */
+function compute(raw) {
+  const norm = normalize(raw);
+  const words = pretokenize(norm.text);
+  const tokens = [{ key: '[START]', word: -1, cont: false }];
+  words.forEach((w, wi) => {
+    if (w.kind === 'word') wordpiece(w.text).forEach((p, k) => tokens.push({ key: p, word: wi, cont: k > 0 && p !== '[UNK]' }));
+    else tokens.push({ key: w.kind === 'punct' ? w.text : '[UNK]', word: wi, cont: false, orig: w.text });
+  });
+  const truncated = tokens.length > CONTEXT ? tokens.length - CONTEXT : 0;
+  if (truncated) tokens.length = CONTEXT;
+  tokens.forEach((t, i) => {
+    t.id = VINDEX.get(t.key) ?? 1;
+    t.v = VOCAB[t.id];
+    t.hue = t.key === '[START]' ? 42 : t.key === '[UNK]' ? 350 : (190 + i * 53) % 360;
+    t.display = t.key.startsWith('##') ? t.key.slice(2) : t.key;
+  });
+  const E = tokens.map((t) => embed(t.key));
+  const PE = tokens.map((_, p) => posEnc(p));
+  const P = PE.map((p) => scale(p, 0.5));
+  const X = E.map((e, i) => add(e, P[i]));
+  const h1 = attentionHead(X.map((x) => R.map((_, b) => x.reduce((s, xa, a) => s + xa * R[a][b], 0))), X, GAIN1, S.causal);
+  const h2 = attentionHead(PE.map(shiftBack), PE, GAIN2, S.causal);
+  const Aavg = h1.A.map((row, i) => row.map((v, j) => (v + h2.A[i][j]) / 2));
+  const Z = X.map((_, i) => {
+    const z = new Array(D).fill(0);
+    X.forEach((v, j) => { const w = (h1.A[i][j] + h2.A[i][j]) / 2; for (let d = 0; d < D; d++) z[d] += w * v[d]; });
+    return z;
+  });
+  const H = X.map((x, i) => layerNorm(add(x, Z[i])));
+  const FF = H.map((h) => FFN.predict(h));
+  const F = H.map((h, i) => layerNorm(add(h, scale(FF[i], 0.5))));
+  const M = { raw, norm, words, tokens, truncated, E, PE, P, X, heads: [h1, h2, { A: Aavg }], Z, H, FF, F };
+  M.pred = predictNext(M);
+  return M;
+}
+
+/* =====================================================================
+   PAGE STATE & HELPERS
+   ===================================================================== */
+const S = {
+  M: null, reached: -1, active: -1, runId: 0, playing: false, instant: false,
+  speed: 1, follow: true, causal: true, temperature: 0.8, focus: 0, head: 2,
+  canv: {}, ffnAnim: NN.anim.create(), ffnIdle: 0,
+};
+const tokChip = (t, i, extra = '') => `<span class="tk ${t.v.kind === 'special' ? 'special' : ''} ${t.key === '[UNK]' ? 'unk' : ''} ${extra}" style="--h:${t.hue}">${t.cont ? '<span class="hash">##</span>' : ''}${esc(t.display)}</span>`;
+const delay = (i, base) => (S.instant ? 0 : Math.round((i * base) / S.speed));
+const cellBg = (v, max = 1.6) => {
+  const a = clamp(Math.abs(v) / max, 0, 1);
+  return v >= 0 ? `rgba(34,211,238,${0.08 + 0.82 * a})` : `rgba(168,85,247,${0.08 + 0.82 * a})`;
+};
+function strip(vec, d0 = 0, step = 18, cls = 'rv-pop', max = 1.6) {
+  return `<div class="vstrip">${vec.map((v, k) => `<span class="vc ${cls}" style="--d:${d0 + delay(k, step)}ms;background:${cellBg(v, max)}" title="d${k + 1} (${DIM_NAMES[k]}): ${fmt(v, 3)}">${fmt(v, 1)}</span>`).join('')}</div>`;
+}
+function focusBar() {
+  return `<div class="flex flex-wrap items-center gap-1.5"><span class="text-[11px] text-slate-500 mr-1">Focus token:</span>${S.M.tokens.map((t, i) =>
+    `<button type="button" class="tk sm ${t.v.kind === 'special' ? 'special' : ''} ${t.key === '[UNK]' ? 'unk' : ''} ${i === S.focus ? 'on' : ''}" style="--h:${t.hue}" data-focus="${i}" aria-pressed="${i === S.focus}">${t.cont ? '<span class="hash">##</span>' : ''}${esc(t.display)}</button>`).join('')}</div>`;
+}
+function startCanvas(name, dur, persistent = false) {
+  S.canv[name] = { start: performance.now(), dur: S.instant ? 1 : dur / S.speed, persistent };
+}
+
+/* =====================================================================
+   STAGES
+   ===================================================================== */
+const STAGES = [
+  {
+    short: 'Text', title: 'Text in: letters are secretly numbers', info: 'characters',
+    what: 'To a computer your sentence is a row of characters, and every character is stored as a number (its Unicode code).',
+    why: 'Language AI never sees letters, only numbers. Every next step turns text into more useful numbers.',
+    render(M) {
+      const chars = Array.from(M.raw).slice(0, 90);
+      const html = chars.map((c, i) => `<div class="charbox rv" style="--d:${delay(i, 28)}ms"><span class="c">${c === ' ' ? '␣' : esc(c)}</span><span class="n">${c.codePointAt(0)}</span></div>`).join('');
+      return { html: `<div class="flex flex-wrap gap-1">${html}</div>
+        <p class="mt-3 text-[11px] text-slate-500 rv" style="--d:${delay(chars.length, 28)}ms">“␣” is a space. <b class="text-slate-300">${Array.from(M.raw).length}</b> characters = ${Array.from(M.raw).length} numbers. But these numbers carry no meaning yet: “A” = 65 and “B” = 66 are neighbours, yet unrelated.</p>`,
+        dur: delay(chars.length + 1, 28) + 600 };
+    },
+  },
+  {
+    short: 'Clean', title: 'Clean up the text (normalization)', info: 'normalization',
+    what: 'Tidy the text so small differences don\'t matter: trim spaces, remove accents, straighten quotes and (here) make everything lower-case.',
+    why: 'Without this, “Hello”, “hello” and “HELLO” would look like three unrelated things.',
+    render(M) {
+      const c = M.norm.counts;
+      const badges = [
+        ['Extra spaces removed', c.space], ['Accents removed (é → e)', c.accent], ['Fancy quotes straightened', c.quote], ['Letters made lower-case', c.lower],
+      ].map(([l, n], i) => `<span class="rv chip ${n ? 'bg-amber-400/10 text-amber-200 border border-amber-400/40' : 'bg-slate-800/60 text-slate-500 border border-slate-600/30'} !normal-case !tracking-normal" style="--d:${delay(i, 160)}ms">${n ? '✓' : '·'} ${l}: ${n}</span>`).join('');
+      const after = M.norm.chars.map((o, i) => `<div class="charbox rv ${o.changed ? 'changed' : ''}" style="--d:${delay(4, 160) + delay(i, 18)}ms"><span class="c">${o.c === ' ' ? '␣' : esc(o.c)}</span></div>`).join('');
+      return { html: `<div class="space-y-3">
+          <div class="text-xs"><span class="text-slate-500 mr-2">Before:</span><span class="font-mono text-slate-300">${esc(M.raw)}</span></div>
+          <div class="flex flex-wrap gap-1.5">${badges}</div>
+          <div><div class="text-xs text-slate-500 mb-1">After <span class="text-amber-300">(changed characters glow amber)</span>:</div><div class="flex flex-wrap gap-1">${after}</div></div>
+        </div>`, dur: delay(4, 160) + delay(M.norm.chars.length, 18) + 600 };
+    },
+  },
+  {
+    short: 'Split', title: 'Split at spaces & punctuation (pre-tokenization)', info: 'pretokenization',
+    what: 'A rough first cut: every space and punctuation mark becomes a boundary.',
+    why: 'Now the tokenizer knows where each word begins and ends, so it can work on one word at a time.',
+    render(M) {
+      const chips = M.words.map((w, i) => {
+        const cls = w.kind === 'word' ? 'bg-slate-800/70 border-slate-500/40 text-slate-100' : w.kind === 'punct' ? 'bg-cyan-400/10 border-cyan-400/40 text-cyan-200' : 'bg-rose-400/10 border-rose-400/40 text-rose-200';
+        return `<span class="rv-x inline-flex px-2.5 py-1 rounded-lg border font-mono text-sm ${cls}" style="--d:${delay(i, 110)}ms">${esc(w.text)}</span>`;
+      }).join('<span class="text-slate-600 self-center">|</span>');
+      const nw = M.words.filter((w) => w.kind === 'word').length;
+      return { html: `<div class="font-mono text-sm text-slate-400 mb-3">“${esc(M.norm.text)}”</div>
+        <div class="flex flex-wrap gap-1.5 items-center">${chips}</div>
+        <p class="mt-3 text-[11px] text-slate-500 rv" style="--d:${delay(M.words.length, 110)}ms"><b class="text-slate-300">${nw}</b> words and <b class="text-cyan-300">${M.words.length - nw}</b> punctuation/other marks.</p>`,
+        dur: delay(M.words.length + 1, 110) + 500 };
+    },
+  },
+  {
+    short: 'Subwords', title: 'Break words into tokens (subword tokenization)', info: 'subword',
+    what: 'Words the model knows stay whole. Other words are split into smaller known pieces, longest match first. “##” means “this piece is glued to the one before”.',
+    why: 'With a list of a few thousand pieces, a model can spell any word, even brand-new ones like “ChatGPT”, without needing an endless dictionary.',
+    render(M) {
+      let k = 0;
+      const groups = [];
+      groups.push(`<div class="rv flex flex-col items-center gap-1" style="--d:0ms"><span class="text-[10px] text-amber-300/70">special</span>${tokChip(M.tokens[0], 0)}</div>`);
+      M.words.forEach((w, wi) => {
+        const toks = M.tokens.map((t, i) => [t, i]).filter(([t]) => t.word === wi);
+        if (!toks.length) return;
+        k++;
+        const split = toks.length > 1;
+        groups.push(`<div class="rv flex flex-col items-center gap-1 ${split ? 'px-2 py-1 rounded-xl border border-purple-400/25 bg-purple-500/5' : ''}" style="--d:${delay(k, 140)}ms">
+          <span class="text-[10px] ${split ? 'text-purple-300' : 'text-slate-500'} font-mono">${esc(w.text)}${split ? ` → ${toks.length} pieces` : ''}</span>
+          <div class="flex gap-1">${toks.map(([t, i], m) => `<span class="rv-pop" style="--d:${delay(k, 140) + delay(m + 1, 160)}ms">${tokChip(t, i)}</span>`).join('')}</div></div>`);
+      });
+      const nSplit = M.words.filter((_, wi) => M.tokens.filter((t) => t.word === wi).length > 1).length;
+      const unk = M.tokens.filter((t) => t.key === '[UNK]').length;
+      return { html: `<div class="flex flex-wrap gap-2 items-end">${groups.join('')}</div>
+        <div class="mt-3 flex flex-wrap gap-3 text-[11px] text-slate-500 rv" style="--d:${delay(k + 2, 140)}ms">
+          <span><span class="tk sm special">[START]</span> special token ${NN.Info.icon('specialTokens')}</span>
+          <span><span class="tk sm" style="--h:280"><span class="hash">##</span>ing</span> glued piece</span>
+          ${unk ? `<span><span class="tk sm unk">[UNK]</span> unknown symbol ${NN.Info.icon('unknownToken')}</span>` : ''}
+          <span>· <b class="text-slate-300">${M.tokens.length}</b> tokens in total${nSplit ? `, ${nSplit} word${nSplit > 1 ? 's' : ''} split into pieces` : ''}</span>
+        </div>
+        ${M.truncated ? `<p class="mt-2 text-[11px] text-rose-300 rv" style="--d:${delay(k + 3, 140)}ms">⚠ ${M.truncated} token(s) were cut off: this toy model's context window is ${CONTEXT} tokens. ${NN.Info.icon('contextWindow')}</p>` : ''}`,
+        dur: delay(k + 3, 140) + 700 };
+    },
+  },
+  {
+    short: 'IDs', title: 'Look up each token\'s ID number', info: 'tokenId',
+    what: 'Every token is replaced by its position number in the model\'s vocabulary list. Watch each card flip from text to number.',
+    why: 'From now on the model only works with these numbers. When people say an AI "used 1,000 tokens", they mean 1,000 of these IDs.',
+    render(M) {
+      const cards = M.tokens.map((t, i) => `<span class="flip"><span class="flip-in" style="--d:${delay(i, 120)}ms">
+          <span class="flip-f">${tokChip(t, i)}</span>
+          <span class="flip-b"><span class="tk w-full justify-center" style="--h:${t.hue}">${t.id}</span></span></span></span>`).join('');
+      const base = delay(M.tokens.length, 120) + 400;
+      const ids = M.tokens.map((t, i) => `<span class="rv-pop inline-block" style="--d:${base + delay(i, 60)}ms;color:hsl(${t.hue} 95% 78%)">${t.id}</span>`).join('<span class="text-slate-600">, </span>');
+      const uniq = [...new Map(M.tokens.map((t) => [t.key, t])).values()].slice(0, 14);
+      const rows = uniq.map((t, i) => `<tr class="rv-x" style="--d:${base + delay(i, 50)}ms"><td class="py-0.5 pr-3 font-mono" style="color:hsl(${t.hue} 95% 78%)">${esc(t.key)}</td><td class="pr-3 font-mono text-slate-300">${t.id}</td><td class="text-slate-500">${t.v.kind === 'word' ? 'whole word' : t.v.kind === 'piece' ? 'word piece' : t.v.kind === 'letter' ? 'single letter' : t.v.kind}</td></tr>`).join('');
+      return { html: `<div class="flex flex-wrap gap-2">${cards}</div>
+        <div class="mt-4 grid md:grid-cols-2 gap-4">
+          <div><div class="text-xs text-slate-500 mb-1">What the model actually receives:</div>
+            <div class="font-mono text-sm rounded-xl bg-slate-950/70 border border-white/5 p-3 break-words">[ ${ids} ]</div></div>
+          <div><div class="text-xs text-slate-500 mb-1 flex items-center gap-1">Vocabulary lookup (${VOCAB.length} tokens in this toy model) ${NN.Info.icon('vocabulary')}</div>
+            <table class="text-xs"><thead><tr class="text-slate-500 text-left"><th class="pr-3 font-medium">token</th><th class="pr-3 font-medium">ID</th><th class="font-medium">type</th></tr></thead><tbody>${rows}</tbody></table></div>
+        </div>`, dur: base + delay(Math.max(M.tokens.length, uniq.length), 60) + 600 };
+    },
+  },
+  {
+    short: 'Embed', title: 'Embeddings: give each token a meaning vector', info: 'embedding',
+    what: 'Each ID is swapped for a list of 8 numbers (a vector). Words with similar meanings get similar numbers, so they land close together on the meaning map.',
+    why: 'IDs are only labels: ID 42 is not "closer" to 43 in meaning. Embeddings give the model a sense of what words mean and how they relate.',
+    render(M) {
+      const rows = M.tokens.map((t, i) => `<div class="flex items-center gap-2 rv-x" style="--d:${delay(i, 90)}ms">
+          <span class="w-20 shrink-0 text-right">${tokChip(t, i, 'sm')}</span>${strip(M.E[i], delay(i, 90), 25)}</div>`).join('');
+      startCanvas('map', 1400 + M.tokens.length * 90);
+      return { html: `<div class="grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+          <div class="overflow-x-auto thin-scroll">
+            <div class="flex items-center gap-2 mb-1 text-[9px] font-mono text-slate-500"><span class="w-20 shrink-0 text-right">${NN.Info.icon('dimensions')}</span>
+              <div class="vstrip">${DIM_NAMES.map((n, k) => `<span class="text-center truncate" title="${n}">d${k + 1}</span>`).join('')}</div></div>
+            <div class="space-y-1">${rows}</div>
+            <p class="mt-2 text-[10px] text-slate-500 leading-relaxed">Toy-model hint: d1 ≈ grammar, d2 ≈ pronoun, d3 ≈ living thing, d4 ≈ action, d5 ≈ object/place, d6 ≈ describing, d7 ≈ time, d8 ≈ punctuation. In real models nobody names the dimensions; they are learned. <span class="text-cyan-300">Cyan</span> = positive, <span class="text-purple-300">purple</span> = negative.</p>
+          </div>
+          <div><div class="text-xs text-slate-500 mb-1 flex items-center gap-1">Meaning map ${NN.Info.icon('meaningMap')}</div>
+            <div class="relative h-72 rounded-xl bg-slate-950/60 border border-white/5"><canvas id="mapCanvas" aria-label="Meaning map of tokens"></canvas></div></div>
+        </div>`, dur: Math.max(delay(M.tokens.length, 90) + 700, 1400 / S.speed + delay(M.tokens.length, 90)) };
+    },
+  },
+  {
+    short: 'Position', title: 'Add position information (positional encoding)', info: 'positionalEncoding',
+    what: 'Each position gets its own pattern of waves. That pattern is added to the token\'s vector, so the model knows which token came 1st, 2nd, 3rd…',
+    why: 'Attention on its own ignores order. Without positions, “dog bites man” and “man bites dog” would look identical.',
+    render(M) {
+      const i = S.focus, t = M.tokens[i];
+      startCanvas('pe', 1600);
+      const b = S.instant ? 0 : 1300 / S.speed;
+      return { html: `<div class="relative h-44 rounded-xl bg-slate-950/60 border border-white/5"><canvas id="peCanvas" aria-label="Positional encoding waves"></canvas></div>
+        <div class="mt-3">${focusBar()}</div>
+        <div class="mt-3 grid gap-2 overflow-x-auto thin-scroll">
+          <div class="flex items-center gap-3 rv-x" style="--d:${b}ms"><span class="w-40 shrink-0 text-xs text-slate-400">meaning of ${tokChip(t, i, 'sm')}</span>${strip(M.E[i], b, 20)}</div>
+          <div class="flex items-center gap-3 rv-x" style="--d:${b + delay(1, 350)}ms"><span class="w-40 shrink-0 text-xs text-slate-400"><span class="text-amber-300 text-base font-bold">+</span> position #${i} waves</span>${strip(M.P[i], b + delay(1, 350), 20)}</div>
+          <div class="flex items-center gap-3 rv-x" style="--d:${b + delay(2, 350)}ms"><span class="w-40 shrink-0 text-xs text-slate-200"><span class="text-emerald-300 text-base font-bold">=</span> transformer input</span>${strip(M.X[i], b + delay(2, 350), 20)}</div>
+        </div>`, dur: b + delay(3, 350) + 600 };
+    },
+  },
+  {
+    short: 'Attention', title: 'Self-attention: tokens look at each other', info: 'attention',
+    what: 'Every token asks: “Which other tokens help me understand myself?” It gives each one a percentage, then blends in their information. Click any token to see what it pays attention to.',
+    why: 'This is the transformer\'s superpower. It links words even when they are far apart, for example “it” and the noun it refers to.',
+    render(M) {
+      const head = S.head, A = M.heads[head].A, i = S.focus, n = M.tokens.length;
+      startCanvas('attn', 1400, true);
+      const color = ['34,211,238', '192,132,252', '251,191,36'][head];
+      const b = S.instant ? 0 : 900 / S.speed;
+      const cols = `grid-template-columns: minmax(3.5rem,auto) repeat(${n}, minmax(1.35rem, 1fr))`;
+      let cells = `<div></div>${M.tokens.map((t) => `<div class="hh" style="color:hsl(${t.hue} 90% 75%)" title="${esc(t.key)}">${esc(t.display.slice(0, 7))}</div>`).join('')}`;
+      M.tokens.forEach((tq, q) => {
+        cells += `<div class="hl" style="color:hsl(${tq.hue} 90% 75%)" title="${esc(tq.key)}">${esc(tq.display.slice(0, 8))}</div>`;
+        M.tokens.forEach((tk, k) => {
+          const w = A[q][k];
+          const masked = S.causal && k > q;
+          cells += masked
+            ? `<div class="hc masked rv-pop" style="--d:${b + delay(q, 45)}ms" title="masked: “${esc(tq.key)}” can't see the future">×</div>`
+            : `<div class="hc rv-pop ${q === i ? 'rowsel' : ''}" style="--d:${b + delay(q, 45)}ms;background:rgba(${color},${0.06 + 0.94 * Math.sqrt(w)})" title="“${esc(tq.key)}” → “${esc(tk.key)}”: ${(w * 100).toFixed(1)}%">${w >= 0.1 ? Math.round(w * 100) : ''}</div>`;
+        });
+      });
+      const top = A[i].map((w, j) => [w, j]).sort((a, c) => c[0] - a[0]).slice(0, 3);
+      const [w0, j0] = top[0];
+      const hd = M.heads[head === 2 ? 0 : head];
+      const rawScore = hd.S ? hd.S[i][j0] : NaN;
+      const explain = head === 2
+        ? 'Combined view: the average of both heads.'
+        : `Score = (Query of “${esc(M.tokens[i].key)}” · Key of “${esc(M.tokens[j0].key)}”) ÷ √${D} = <b class="text-slate-200">${fmt(rawScore, 2)}</b> → softmax → <b class="text-slate-200">${(w0 * 100).toFixed(1)}%</b>`;
+      return { html: `<div class="flex flex-wrap items-center gap-2 mb-3">
+          <span class="text-[11px] text-slate-500 flex items-center gap-1">Attention head ${NN.Info.icon('multiHead')}</span>
+          <button type="button" class="tab ${head === 0 ? 'on' : ''}" data-head="0">Head 1 · meaning</button>
+          <button type="button" class="tab ${head === 1 ? 'on' : ''}" data-head="1">Head 2 · previous word</button>
+          <button type="button" class="tab ${head === 2 ? 'on' : ''}" data-head="2">Both heads</button>
+        </div>
+        ${focusBar()}
+        <div class="mt-3 relative h-60 rounded-xl bg-slate-950/60 border border-white/5"><canvas id="attnCanvas" aria-label="Attention arcs"></canvas></div>
+        <div class="mt-4 grid xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-4">
+          <div class="overflow-x-auto thin-scroll"><div class="text-xs text-slate-500 mb-1">Attention table: each row is a token, showing how much (%) it looks at each column.</div><div class="hm" style="${cols}">${cells}</div></div>
+          <div class="rv text-xs text-slate-400 leading-relaxed space-y-2 rounded-xl border border-white/5 bg-slate-950/50 p-3" style="--d:${b + delay(n, 45)}ms">
+            <div class="flex items-center gap-1 text-slate-300 font-semibold">How the % is calculated ${NN.Info.icon('qkv')}</div>
+            <div><b class="text-cyan-300">Query</b>: what this token is looking for. <b class="text-purple-300">Key</b>: what each token offers. <b class="text-emerald-300">Value</b>: the information it hands over.</div>
+            <div>${tokChip(M.tokens[i], i, 'sm')} looks most at: ${top.map(([w, j]) => `${tokChip(M.tokens[j], j, 'sm')} <b class="text-slate-200">${(w * 100).toFixed(0)}%</b>`).join(' · ')}</div>
+            <div class="font-mono text-[11px]">${explain}</div>
+            <div class="text-slate-500">${head === 0 ? 'Head 1 links kinds of words: describing words ↔ nouns, actions ↔ who does them, pronouns ↔ people/animals.' : head === 1 ? 'Head 2 uses only the position waves: each token mostly looks at the token right before it.' : 'Real models run many heads at once and combine them, each spotting a different kind of relationship.'}</div>
+            <div class="text-slate-500">Then each token's vector becomes a blend of the Values, weighted by these %, and is added back to the original ${NN.Info.icon('residual')} and normalized ${NN.Info.icon('layerNorm')}.</div>
+          </div>
+        </div>`, dur: b + delay(n + 1, 45) + 900 };
+    },
+  },
+  {
+    short: 'Feed-fwd', title: 'Feed-forward network: process the gathered information', info: 'feedForward',
+    what: 'Each token\'s updated vector now goes through a small neural network on its own, just like the networks on the Basic page: 8 numbers → 16 (with ReLU) → back to 8.',
+    why: 'Attention gathers information from other tokens; the feed-forward network "thinks" about it. Attention + feed-forward = one transformer block.',
+    render(M) {
+      const i = S.focus;
+      FFN.forward(M.H[i]);
+      S.ffnAnim = NN.anim.create('fwd');
+      startCanvas('ffn', 1, true);
+      const b = S.instant ? 0 : 1500 / S.speed;
+      return { html: `${focusBar()}
+        <div class="mt-3 relative h-72 rounded-xl grid-bg bg-slate-950/60 border border-white/5"><canvas id="ffnCanvas" aria-label="Feed-forward neural network"></canvas></div>
+        <div class="mt-3 grid gap-2 overflow-x-auto thin-scroll">
+          <div class="flex items-center gap-3 rv-x" style="--d:${b}ms"><span class="w-44 shrink-0 text-xs text-slate-400">after attention ${NN.Info.icon('layerNorm')}</span>${strip(M.H[i], b, 20, 'rv-pop', 2.2)}</div>
+          <div class="flex items-center gap-3 rv-x" style="--d:${b + delay(1, 350)}ms"><span class="w-44 shrink-0 text-xs text-slate-400"><span class="text-amber-300 font-bold">+</span> feed-forward output ×½</span>${strip(scale(M.FF[i], 0.5), b + delay(1, 350), 20, 'rv-pop', 2.2)}</div>
+          <div class="flex items-center gap-3 rv-x" style="--d:${b + delay(2, 350)}ms"><span class="w-44 shrink-0 text-xs text-slate-200"><span class="text-emerald-300 font-bold">=</span> final vector (normalized)</span>${strip(M.F[i], b + delay(2, 350), 20, 'rv-pop', 2.2)}</div>
+        </div>
+        <p class="mt-3 text-[11px] text-slate-500 rv" style="--d:${b + delay(3, 350)}ms">Real models stack many of these blocks (attention → feed-forward) on top of each other: GPT-2 small has 12, the largest models around 100. ${NN.Info.icon('transformerBlock')} <a href="index.html" class="text-cyan-300 hover:underline">See how a network like this learns →</a></p>`,
+        dur: b + delay(3, 350) + 700 };
+    },
+  },
+  {
+    short: 'Predict', title: 'Predict the next token', info: 'nextToken',
+    what: 'The last token\'s final vector is compared with every word in the vocabulary to give each a score (logit). Softmax turns the scores into probabilities.',
+    why: 'This is all a language model does. Writing a whole answer is just this step on repeat: pick a word, add it, run everything again.',
+    render(M) {
+      const top = M.pred.slice(0, 8), max = top[0].p;
+      const bars = top.map((c, k) => {
+        const label = c.key === '[END]' ? '[END] (stop)' : c.key;
+        return `<div class="flex items-center gap-2 rv-x" style="--d:${delay(k, 110)}ms">
+          <span class="w-24 shrink-0 text-right font-mono text-sm ${k === 0 ? 'text-amber-200' : 'text-slate-300'}">${esc(label)}</span>
+          <div class="flex-1 h-5 rounded-md bg-slate-800/60 overflow-hidden"><div class="bar-fill h-full rounded-md ${k === 0 ? 'bg-gradient-to-r from-amber-400 to-amber-300 shadow-[0_0_12px_rgba(251,191,36,.8)]' : 'bg-gradient-to-r from-purple-500/80 to-cyan-400/80'}" style="--w:${Math.max(2, (c.p / max) * 100)}%;--d:${delay(k, 110) + 150}ms"></div></div>
+          <span class="w-14 shrink-0 font-mono text-xs text-slate-300">${(c.p * 100).toFixed(1)}%</span></div>`;
+      }).join('');
+      const ctx = M.tokens.slice(1).map((t, i) => tokChip(t, i + 1, 'sm')).join(' ');
+      const b = delay(9, 110);
+      return { html: `<div class="flex flex-wrap items-center gap-1 mb-3 text-xs text-slate-400">Context: ${ctx} <span class="tk sm special pulse-dot">?</span></div>
+        <div class="space-y-1.5">${bars}</div>
+        <div class="mt-4 flex flex-wrap gap-2 rv" style="--d:${b}ms">
+          <button type="button" id="addTopBtn" class="btn btn-amber">Add “${esc(top[0].key)}” and run again</button>
+          <button type="button" id="sampleBtn" class="btn btn-ghost">Pick randomly using temperature ${NN.Info.icon('temperature')}</button>
+        </div>
+        <p class="mt-3 text-[11px] text-slate-500 rv" style="--d:${b}ms">Adding the chosen word and running again is called <b class="text-slate-300">autoregressive generation</b> ${NN.Info.icon('autoregressive')}. Temperature is ${S.temperature}: lower makes the top word win more often, higher spreads the chances out. These scores come from a toy model with a few grammar hints, not from billions of sentences, so its guesses are simple.</p>
+        <div class="mt-4 rv rounded-xl border border-amber-400/20 bg-amber-400/5 p-3 text-xs text-slate-300" style="--d:${b + delay(1, 200)}ms">
+          <b class="text-amber-200">The whole journey:</b> ${Array.from(M.raw).length} characters → ${M.words.length} pieces after splitting → ${M.tokens.length} tokens → ${M.tokens.length} ID numbers → ${M.tokens.length} vectors of ${D} numbers → attention (2 heads) → feed-forward (${FFN.paramCount.total} parameters) → ${M.pred.length} next-word probabilities.
+        </div>`, dur: b + delay(2, 200) + 600 };
+    },
+  },
+];
+
+/* =====================================================================
+   CANVAS DRAWING
+   ===================================================================== */
+const MAP_ANCHOR = {
+  func: [-0.65, -0.55], pron: [-0.2, -0.85], animal: [0.55, 0.7], person: [0.15, 0.8], action: [-0.75, 0.45],
+  place: [0.8, -0.05], food: [0.85, 0.4], object: [0.5, -0.5], tech: [0.1, -0.35], describe: [-0.2, 0.25],
+  time: [-0.88, -0.05], punct: [-0.5, -0.2], special: [-0.88, -0.85], piece: [0.05, 0.05], letter: [0.25, 0.1],
+};
+const mapPos = (key) => {
+  const v = VOCAB[VINDEX.get(key) ?? 1];
+  const r = mulberry32(hashString('map:' + key));
+  const [ax, ay] = MAP_ANCHOR[v.sub] || [0, 0];
+  return [ax + gaussian(r) * 0.07, ay + gaussian(r) * 0.07];
+};
+const REF_WORDS = ['dog', 'bird', 'girl', 'teacher', 'run', 'eat', 'read', 'house', 'park', 'pizza', 'tea', 'book', 'ball', 'happy', 'red', 'fast', 'today', 'night', 'the', 'of', 'she', 'they', 'computer', 'data', '!', ','];
+
+function drawMap(now) {
+  const c = $('mapCanvas'); if (!c || !S.M) return;
+  const { ctx, w, h } = render.fitCanvas(c);
+  ctx.clearRect(0, 0, w, h);
+  const st = S.canv.map; const prog = st ? clamp((now - st.start) / st.dur, 0, 1) : 1;
+  const toX = (x) => w / 2 + x * (w / 2 - 34), toY = (y) => h / 2 - y * (h / 2 - 22);
+  ctx.font = '600 9px Inter, sans-serif'; ctx.textAlign = 'center';
+  ['animal', 'person', 'action', 'place', 'food', 'object', 'tech', 'describe', 'time', 'func', 'pron', 'punct'].forEach((s) => {
+    const [x, y] = MAP_ANCHOR[s];
+    ctx.fillStyle = 'rgba(148,163,184,0.04)'; ctx.beginPath(); ctx.arc(toX(x), toY(y), 30, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(148,163,184,0.38)'; ctx.fillText(SUB[s].label.toUpperCase(), toX(x), toY(y) - 24);
+  });
+  ctx.font = '500 9px "JetBrains Mono", monospace';
+  REF_WORDS.forEach((k) => {
+    if (!VINDEX.has(k)) return;
+    const [x, y] = mapPos(k);
+    ctx.fillStyle = 'rgba(148,163,184,0.35)'; ctx.beginPath(); ctx.arc(toX(x), toY(y), 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(148,163,184,0.4)'; ctx.fillText(k, toX(x), toY(y) + 11);
+  });
+  const n = S.M.tokens.length;
+  S.M.tokens.forEach((t, i) => {
+    const local = clamp((prog * (1 + n * 0.08) - i * 0.08), 0, 1);
+    if (local <= 0) return;
+    const e = easeOut(local);
+    const [tx, ty] = mapPos(t.key);
+    const x = toX(lerp(0, tx, e)), y = toY(lerp(0, ty, e));
+    ctx.save();
+    ctx.shadowColor = `hsl(${t.hue} 90% 60%)`; ctx.shadowBlur = 12;
+    ctx.fillStyle = `hsl(${t.hue} 90% 65%)`;
+    ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.font = '600 11px "JetBrains Mono", monospace';
+    ctx.fillStyle = `hsla(${t.hue}, 95%, 82%, ${e})`;
+    ctx.fillText(t.display, x, y - 8);
+  });
+}
+
+function drawPE(now) {
+  const c = $('peCanvas'); if (!c || !S.M) return;
+  const { ctx, w, h } = render.fitCanvas(c);
+  ctx.clearRect(0, 0, w, h);
+  const st = S.canv.pe; const prog = st ? clamp((now - st.start) / st.dur, 0, 1) : 1;
+  const n = S.M.tokens.length, m = { l: 18, r: 18, t: 14, b: 26 };
+  const xOf = (p) => m.l + (n === 1 ? 0.5 : p / (n - 1)) * (w - m.l - m.r);
+  const cols = ['34,211,238', '192,132,252', '52,211,153', '251,191,36'];
+  const band = (h - m.t - m.b) / 4;
+  for (let k = 0; k < 4; k++) {
+    const cy = m.t + band * (k + 0.5), amp = band * 0.38;
+    ctx.strokeStyle = 'rgba(148,163,184,0.08)'; ctx.beginPath(); ctx.moveTo(m.l, cy); ctx.lineTo(w - m.r, cy); ctx.stroke();
+    ctx.fillStyle = `rgba(${cols[k]},0.7)`; ctx.font = '600 8.5px Inter, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(k === 0 ? 'fast wave' : k === 3 ? 'slow wave' : '', m.l, cy - amp - 2);
+    ctx.save(); ctx.shadowColor = `rgba(${cols[k]},0.9)`; ctx.shadowBlur = 6;
+    ctx.strokeStyle = `rgba(${cols[k]},0.85)`; ctx.lineWidth = 1.6; ctx.beginPath();
+    const steps = 200, lim = Math.max(1, Math.round(steps * prog));
+    for (let s = 0; s <= lim; s++) {
+      const p = (s / steps) * Math.max(n - 1, 1);
+      const y = cy - Math.sin(p * peFreq(k)) * amp;
+      s ? ctx.lineTo(xOf(p), y) : ctx.moveTo(xOf(p), y);
+    }
+    ctx.stroke(); ctx.restore();
+    for (let p = 0; p < n; p++) {
+      if (p / Math.max(n - 1, 1) > prog + 1e-6) break;
+      const y = cy - Math.sin(p * peFreq(k)) * amp;
+      ctx.fillStyle = p === S.focus ? '#fff' : `rgba(${cols[k]},1)`;
+      ctx.beginPath(); ctx.arc(xOf(p), y, p === S.focus ? 3.5 : 2.4, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.strokeStyle = 'rgba(251,191,36,0.5)'; ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(xOf(S.focus), m.t); ctx.lineTo(xOf(S.focus), h - m.b + 4); ctx.stroke(); ctx.setLineDash([]);
+  ctx.textAlign = 'center'; ctx.font = '600 9.5px "JetBrains Mono", monospace';
+  S.M.tokens.forEach((t, p) => {
+    ctx.fillStyle = p === S.focus ? '#fde68a' : `hsl(${t.hue} 80% 72%)`;
+    ctx.fillText(n > 14 ? String(p) : `${p}:${t.display.slice(0, 6)}`, xOf(p), h - 9);
+  });
+}
+
+let attnHit = [];
+function drawAttn(now) {
+  const c = $('attnCanvas'); if (!c || !S.M) return;
+  const { ctx, w, h } = render.fitCanvas(c);
+  ctx.clearRect(0, 0, w, h);
+  const st = S.canv.attn; const prog = st ? clamp((now - st.start) / st.dur, 0, 1) : 1;
+  const M = S.M, n = M.tokens.length, A = M.heads[S.head].A, f = S.focus;
+  const col = ['34,211,238', '192,132,252', '251,191,36'][S.head];
+  const m = 26, base = h - 30;
+  const xOf = (i) => (n === 1 ? w / 2 : m + (i / (n - 1)) * (w - 2 * m));
+  const fs = n > 16 ? 9 : n > 10 ? 10 : 11.5;
+  // arcs from every key j into the focus token
+  for (let j = 0; j < n; j++) {
+    const wgt = A[f][j];
+    if (wgt < 0.005) continue;
+    const x0 = xOf(j), x1 = xOf(f);
+    const lift = j === f ? 0 : Math.min(base - 18, 22 + Math.abs(x1 - x0) * 0.45);
+    const pt = (t) => {
+      if (j === f) { const a = Math.PI / 2 + t * Math.PI * 2; return [x0 + Math.cos(a) * 12, base - 26 - Math.sin(a) * 12 - 12]; }
+      const cx = (x0 + x1) / 2, cy = base - 14 - lift * 2;
+      const u = 1 - t;
+      return [u * u * x0 + 2 * u * t * cx + t * t * x1, u * u * (base - 14) + 2 * u * t * cy + t * t * (base - 14)];
+    };
+    const local = clamp(prog * 1.4 - (j / n) * 0.4, 0, 1);
+    if (local <= 0) continue;
+    ctx.save();
+    ctx.strokeStyle = `rgba(${col},${0.15 + 0.85 * Math.sqrt(wgt)})`;
+    ctx.lineWidth = 0.8 + 9 * wgt;
+    ctx.shadowColor = `rgba(${col},0.8)`; ctx.shadowBlur = 8 * wgt;
+    ctx.beginPath();
+    const steps = 40;
+    for (let s = 0; s <= steps * local; s++) { const [x, y] = pt(s / steps); s ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.stroke(); ctx.restore();
+    if (local >= 1 && wgt > 0.04 && !NN.util.prefersReducedMotion) {
+      const tt = ((now / 1000) * 0.5 + j * 0.17) % 1;
+      const [px, py] = pt(tt);
+      ctx.fillStyle = `rgba(255,255,255,${0.4 + 0.6 * wgt})`;
+      ctx.beginPath(); ctx.arc(px, py, 1.5 + 3 * wgt, 0, Math.PI * 2); ctx.fill();
+    }
+    if (local >= 1 && wgt >= 0.06) {
+      const [lx, ly] = pt(0.5);
+      ctx.font = '600 10px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(2,6,23,0.85)'; ctx.fillRect(lx - 16, ly - 16, 32, 13);
+      ctx.fillStyle = `rgb(${col})`; ctx.fillText(`${Math.round(wgt * 100)}%`, lx, ly - 6);
+    }
+  }
+  // token labels
+  attnHit = [];
+  ctx.font = `600 ${fs}px "JetBrains Mono", monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  M.tokens.forEach((t, i) => {
+    const label = t.display.length > 7 ? t.display.slice(0, 6) + '…' : t.display;
+    const tw = Math.min(ctx.measureText(label).width + 10, Math.max(18, (w - 2 * m) / Math.max(n - 1, 1) - 2));
+    const x = xOf(i), y = base;
+    const masked = S.causal && i > f;
+    ctx.globalAlpha = masked ? 0.3 : 1;
+    ctx.fillStyle = i === f ? `hsla(${t.hue},90%,55%,0.35)` : `hsla(${t.hue},90%,55%,0.12)`;
+    ctx.strokeStyle = i === f ? '#fde68a' : `hsla(${t.hue},90%,60%,0.6)`;
+    ctx.lineWidth = i === f ? 2 : 1;
+    ctx.beginPath(); ctx.roundRect(x - tw / 2, y - 11, tw, 22, 6); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = `hsl(${t.hue} 95% 82%)`;
+    ctx.fillText(label, x, y + 0.5, tw - 4);
+    ctx.globalAlpha = 1;
+    attnHit.push({ i, x0: x - tw / 2, x1: x + tw / 2, y0: y - 12, y1: y + 12 });
+  });
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left'; ctx.font = '500 10px Inter, sans-serif';
+  ctx.fillStyle = 'rgba(148,163,184,0.7)';
+  ctx.fillText(`Information flowing INTO “${M.tokens[f].display}” · click a token to change focus${S.causal ? ' · greyed tokens are in the future (masked)' : ''}`, 10, 14);
+}
+
+function drawFFN(now, dt) {
+  const c = $('ffnCanvas'); if (!c || !S.M) return;
+  NN.anim.step(S.ffnAnim, dt, 2, false);
+  if (!S.ffnAnim.phase) { S.ffnIdle += dt; if (S.ffnIdle > 900) { S.ffnAnim = NN.anim.create('fwd'); S.ffnIdle = 0; } }
+  const names = ['Token vector', 'Expand + ReLU', 'Back to 8'];
+  render.drawNetwork(c, {
+    net: FFN, anim: S.ffnAnim, opts: { values: true, pulses: true, flow: true }, time: now, banner: false,
+    labelFor: (l, j) => `d${j + 1}`, nameFor: (l) => names[l],
+  });
+}
+
+/* =====================================================================
+   RUNNER (animation sequencing)
+   ===================================================================== */
+function buildStageShells() {
+  $('stages').innerHTML = STAGES.map((st, k) => `
+    <section class="panel stage p-4" id="stage-${k}" aria-labelledby="stage-title-${k}">
+      <div class="flex items-start gap-3">
+        <span class="stage-num">${k + 1}</span>
+        <div class="min-w-0 flex-1">
+          <h2 id="stage-title-${k}" class="text-sm sm:text-base font-semibold text-slate-100 flex items-center gap-2 flex-wrap">${st.title} ${NN.Info.icon(st.info)}</h2>
+          <p class="text-xs text-slate-400 mt-1 leading-relaxed">${st.what}</p>
+        </div>
+      </div>
+      <div class="stage-body mt-4" id="stage-body-${k}"><div class="waiting">Waiting… press <b class="text-amber-300">Transform</b> to start.</div></div>
+      <p class="stage-why hidden mt-4 text-[11px] text-slate-500 leading-relaxed border-t border-white/5 pt-3"><span class="text-amber-300">💡 Why it matters:</span> ${st.why}</p>
+    </section>`).join('');
+  $('stepper').innerHTML = STAGES.map((st, k) => `${k ? `<div class="step-line" id="line-${k}"></div>` : ''}
+    <button type="button" class="step-chip" id="chip-${k}" data-jump="${k}" title="Step ${k + 1}: ${st.short}"><span class="step-dot">${k + 1}</span><span class="step-lbl">${st.short}</span></button>`).join('');
+}
+
+function setStageState() {
+  STAGES.forEach((_, k) => {
+    const el = $(`stage-${k}`), chip = $(`chip-${k}`);
+    el.classList.toggle('reached', k <= S.reached || k === S.active);
+    el.classList.toggle('active', k === S.active);
+    el.querySelector('.stage-why').classList.toggle('hidden', !(k <= S.reached || k === S.active));
+    chip.classList.toggle('done', k <= S.reached && k !== S.active);
+    chip.classList.toggle('active', k === S.active);
+    if (k) $(`line-${k}`).style.setProperty('--p', k <= S.reached + (S.active >= k ? 1 : 0) ? '100%' : '0%');
+  });
+}
+
+function renderStage(k) {
+  const body = $(`stage-body-${k}`);
+  const { html, dur } = STAGES[k].render(S.M);
+  body.classList.remove('in');
+  body.innerHTML = html;
+  NN.Info.decorate(body);
+  void body.offsetWidth; // restart CSS transitions
+  return dur;
+}
+
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+async function wait(ms, token) {
+  const end = performance.now() + ms;
+  while (performance.now() < end) {
+    if (token !== S.runId) throw new Error('cancel');
+    await sleep(Math.min(60, end - performance.now()));
+  }
+  if (token !== S.runId) throw new Error('cancel');
+}
+
+async function playStage(k, token) {
+  S.active = k; setStageState();
+  const dur = renderStage(k);
+  if (S.follow && !S.instant) $(`stage-${k}`).scrollIntoView({ behavior: NN.util.prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+  await nextFrame();
+  $(`stage-body-${k}`).classList.add('in');
+  await wait(dur + (S.instant ? 0 : 350 / S.speed), token);
+  S.reached = Math.max(S.reached, k);
+}
+
+async function run(from, to = STAGES.length - 1) {
+  const token = ++S.runId;
+  setPlaying(true);
+  try {
+    for (let k = from; k <= to; k++) await playStage(k, token);
+    S.active = -1; setStageState();
+  } catch (e) {
+    if (e.message !== 'cancel') throw e;
+  } finally {
+    if (token === S.runId) setPlaying(false);
+  }
+}
+
+function showInstant(upTo = STAGES.length - 1) {
+  S.runId++;
+  S.instant = true;
+  for (let k = 0; k <= upTo; k++) { renderStage(k); $(`stage-body-${k}`).classList.add('in'); }
+  S.instant = false;
+  S.reached = Math.max(S.reached, upTo); S.active = -1;
+  setStageState(); setPlaying(false);
+}
+
+function setPlaying(on) {
+  S.playing = on;
+  ui.setStatus(on ? 'running' : S.reached >= STAGES.length - 1 ? 'done' : 'idle');
+  $('pauseBtn').disabled = !on && S.reached >= STAGES.length - 1;
+  $('pauseLabel').textContent = on ? 'Pause' : 'Continue';
+  $('pauseIcon').innerHTML = on ? '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>' : '<path d="M7 4v16l13-8z"/>';
+  $('nextBtn').disabled = on || S.reached >= STAGES.length - 1;
+}
+
+/* =====================================================================
+   ACTIONS
+   ===================================================================== */
+function transform({ instant = false, keepFocus = false } = {}) {
+  const raw = $('sentence').value;
+  if (!raw.trim()) { $('sentence').focus(); return; }
+  S.M = compute(raw);
+  if (!keepFocus || S.focus >= S.M.tokens.length) S.focus = S.M.tokens.length - 1;
+  S.reached = -1; S.active = -1;
+  STAGES.forEach((_, k) => { $(`stage-body-${k}`).classList.remove('in'); $(`stage-body-${k}`).innerHTML = '<div class="waiting">Coming up…</div>'; });
+  renderStats();
+  if (instant) { showInstant(STAGES.length - 2); run(STAGES.length - 1); }
+  else run(0);
+}
+
+/** Re-draw already-visible stages from `from` onward without replaying (after a setting changes). */
+function refreshFrom(from) {
+  if (!S.M) return;
+  const wasPlaying = S.playing;
+  if (wasPlaying) S.runId++;
+  S.instant = true;
+  for (let k = from; k <= Math.max(S.reached, S.active); k++) { renderStage(k); $(`stage-body-${k}`).classList.add('in'); }
+  S.instant = false;
+  if (wasPlaying) { S.reached = Math.max(S.reached, S.active); S.active = -1; setStageState(); setPlaying(false); }
+}
+
+function addWord(key) {
+  if (key === '[END]') { $('stage-body-9').insertAdjacentHTML('beforeend', '<p class="mt-2 text-xs text-amber-200">The model chose [END]: it thinks the sentence is finished.</p>'); return; }
+  if (S.M.tokens.length >= CONTEXT) { $('stage-body-9').insertAdjacentHTML('beforeend', `<p class="mt-2 text-xs text-rose-300">The context window (${CONTEXT} tokens) is full.</p>`); return; }
+  const el = $('sentence');
+  el.value = el.value.replace(/\s+$/, '') + (PUNCT.includes(key) ? key : ' ' + key);
+  transform({ instant: true });
+}
+
+function renderStats() {
+  const M = S.M;
+  const nw = M.words.filter((w) => w.kind === 'word').length;
+  const realTok = M.tokens.length - 1;
+  const uniq = new Set(M.tokens.map((t) => t.key)).size;
+  const items = [
+    ['Characters', Array.from(M.raw).length, 'characters'], ['Words', nw, 'pretokenization'],
+    ['Tokens', `${realTok} + [START]`, 'token'], ['Unique tokens', uniq, 'vocabulary'],
+    ['Chars per token', realTok ? (Array.from(M.raw).length / realTok).toFixed(1) : '—', 'token'], ['Vocabulary size', VOCAB.length, 'vocabulary'],
+    ['Vector size', D, 'dimensions'], ['Context window', CONTEXT, 'contextWindow'],
+  ];
+  $('stats').innerHTML = items.map(([l, v, info]) => `<div class="rounded-lg bg-slate-950/60 border border-white/5 px-2.5 py-1.5"><dt class="text-[10px] text-slate-500 flex items-center gap-1">${l} ${NN.Info.icon(info)}</dt><dd class="font-mono text-sm text-slate-100">${v}</dd></div>`).join('');
+}
+
+/* =====================================================================
+   MAIN LOOP (canvases)
+   ===================================================================== */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(now - last, 100); last = now;
+  if (S.M) {
+    if (S.reached >= 5 || S.active === 5) drawMap(now);
+    if (S.reached >= 6 || S.active === 6) drawPE(now);
+    if (S.reached >= 7 || S.active === 7) drawAttn(now);
+    if (S.reached >= 8 || S.active === 8) drawFFN(now, dt);
+  }
+  requestAnimationFrame(frame);
+}
+
+/* =====================================================================
+   EVENTS & BOOT
+   ===================================================================== */
+const EXAMPLES = ['The cat sat on the mat.', 'She loves reading books!', 'Transformers are learning quickly.', 'My happy dog chased the ball', 'Unbelievable tokenization ✨', 'Café robots don’t sleep at night'];
+const KEY_TERMS = ['nlp', 'tokenization', 'token', 'subword', 'vocabulary', 'tokenId', 'embedding', 'positionalEncoding', 'attention', 'qkv', 'softmax', 'multiHead', 'feedForward', 'transformerBlock', 'nextToken', 'llm'];
+
+function bindEvents() {
+  $('examples').innerHTML = EXAMPLES.map((e) => `<button type="button" class="text-[11px] px-2 py-1 rounded-lg border border-white/10 bg-slate-900/70 text-slate-300 hover:border-amber-400/50 hover:text-amber-200 transition" data-example="${esc(e)}">${esc(e)}</button>`).join('');
+  $('glossaryChips').innerHTML = KEY_TERMS.map((k) => `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-white/10 bg-slate-900/60 text-slate-300">${NN.GLOSSARY[k].t.split(':')[0].split('(')[0].trim()} ${NN.Info.icon(k)}</span>`).join('');
+  $('examples').addEventListener('click', (e) => { const b = e.target.closest('[data-example]'); if (b) { $('sentence').value = b.dataset.example; transform(); } });
+  $('transformBtn').addEventListener('click', () => transform());
+  $('sentence').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); transform(); } });
+  $('pauseBtn').addEventListener('click', () => {
+    if (S.playing) { S.runId++; S.reached = Math.max(S.reached, S.active); S.active = -1; setStageState(); setPlaying(false); }
+    else if (S.M && S.reached < STAGES.length - 1) run(S.reached + 1);
+  });
+  $('nextBtn').addEventListener('click', () => {
+    if (!S.M) { transform(); return; }
+    if (!S.playing && S.reached < STAGES.length - 1) run(S.reached + 1, S.reached + 1);
+  });
+  $('instantBtn').addEventListener('click', () => { if (!S.M) S.M = compute($('sentence').value || EXAMPLES[0]), renderStats(); showInstant(); });
+  $('speedRange').addEventListener('input', (e) => { S.speed = +e.target.value; $('speedVal').textContent = `${S.speed}×`; ui.setFill(e.target); });
+  $('optFollow').addEventListener('change', (e) => { S.follow = e.target.checked; });
+  $('optCausal').addEventListener('change', (e) => {
+    S.causal = e.target.checked;
+    if (S.M) { const f = S.focus; S.M = compute(S.M.raw); S.focus = Math.min(f, S.M.tokens.length - 1); refreshFrom(7); }
+  });
+  $('tempRange').addEventListener('input', (e) => {
+    S.temperature = +e.target.value; $('tempVal').textContent = S.temperature.toFixed(1); ui.setFill(e.target);
+    if (S.M) { S.M.pred = predictNext(S.M); if (S.reached >= 9 || S.active === 9) refreshFrom(9); }
+  });
+
+  // delegated clicks inside stages: focus chips, head tabs, prediction buttons
+  $('stages').addEventListener('click', (e) => {
+    const f = e.target.closest('[data-focus]');
+    if (f) { S.focus = +f.dataset.focus; refreshFrom(6); return; }
+    const hb = e.target.closest('[data-head]');
+    if (hb) { S.head = +hb.dataset.head; refreshFrom(7); return; }
+    if (e.target.closest('#addTopBtn')) { addWord(S.M.pred[0].key); return; }
+    if (e.target.closest('#sampleBtn')) {
+      let r = Math.random(), pick = S.M.pred[0].key;
+      for (const c of S.M.pred) { r -= c.p; if (r <= 0) { pick = c.key; break; } }
+      addWord(pick);
+    }
+  });
+  $('stepper').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-jump]'); if (!b) return;
+    const k = +b.dataset.jump;
+    if (!S.M) { S.M = compute($('sentence').value || EXAMPLES[0]); S.focus = S.M.tokens.length - 1; renderStats(); }
+    if (k > S.reached) showInstant(k);
+    $(`stage-${k}`).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  // click on attention canvas tokens
+  document.addEventListener('click', (e) => {
+    if (e.target.id !== 'attnCanvas') return;
+    const r = e.target.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    const hit = attnHit.find((h) => x >= h.x0 && x <= h.x1 && y >= h.y0 - 6 && y <= h.y1 + 6);
+    if (hit) { S.focus = hit.i; refreshFrom(6); }
+  });
+}
+
+NN.Info.init();
+buildStageShells();
+bindEvents();
+$('speedVal').textContent = '1×'; $('tempVal').textContent = S.temperature.toFixed(1);
+document.querySelectorAll('input[type=range]').forEach(ui.setFill);
+S.M = compute($('sentence').value); S.focus = S.M.tokens.length - 1; renderStats();
+setPlaying(false); $('pauseBtn').disabled = true; $('nextBtn').disabled = false;
+ui.setStatus('idle');
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
